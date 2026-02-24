@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:gcal_glance/config/crt_theme.dart';
 import 'package:gcal_glance/config/oauth_config.dart';
 import 'package:gcal_glance/screens/calendar_home_page.dart';
 import 'package:gcal_glance/services/google_calendar_service.dart';
@@ -23,10 +24,7 @@ class MyApp extends StatelessWidget {
 
     return MaterialApp(
       title: 'gcal-glance',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
-      ),
+      theme: CrtTheme.themeData(),
       home: CalendarHomePage(calendarService: calendarService),
     );
   }
