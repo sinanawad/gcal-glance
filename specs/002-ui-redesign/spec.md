@@ -20,7 +20,7 @@ The user glances at the app on their secondary portrait monitor to see the curre
 1. **Given** the user is signed in with events loaded, **When** they glance at the app, **Then** the flip clock on the left shows the current time (HH:MM), the date is displayed below it (day-of-week, day, month, year), and the timeline strip shows all events as colored blocks with truncated titles
 2. **Given** events span the working day, **When** the timeline renders, **Then** event blocks are positioned proportionally by time, with hour markers along the top, a NOW marker (vertical line) indicates the current position, and the visible range shows one past event plus all future events
 3. **Given** an event just ended, **When** the timeline updates, **Then** it smoothly scrolls so the ended event is the single past event visible on the left edge
-3. **Given** the app is running, **When** one minute passes, **Then** the flip clock updates with an animation and the NOW marker shifts position
+4. **Given** the app is running, **When** one minute passes, **Then** the flip clock updates with an animation and the NOW marker shifts position
 
 ---
 

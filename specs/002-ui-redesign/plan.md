@@ -26,7 +26,7 @@ Replace the current Material 3 default UI with a retro CRT-inspired layout featu
 | Principle | Status | Notes |
 |-----------|--------|-------|
 | I. Widget Composition & Separation | PASS | New widgets each in own file under lib/widgets/, screen in lib/screens/ |
-| II. Stateless by Default | PASS | All new widgets StatelessWidget except FlipDigit (owns animation state — permitted per constitution). App-level state stays in CalendarHomePage |
+| II. Stateless by Default | PASS | All new widgets StatelessWidget except FlipDigit (owns flip animation) and TimelineStrip (may own auto-scroll animation in US4). Both permitted per constitution — they hold local ephemeral animation state only. App-level state stays in CalendarHomePage |
 | III. Immutable Models | PASS | CalendarEvent unchanged. No new mutable models |
 | IV. Secure Credential Handling | PASS | Auth/token flow unchanged |
 | V. Defensive API Integration | PASS | Error handling unchanged, SnackBars preserved |
@@ -106,7 +106,7 @@ CalendarHomePage (StatefulWidget — owns timers, auth state, event data)
 │   │   └── FlipDigit (StatefulWidget — owns AnimationController for flip)
 │   ├── Date display (VT323 font)
 │   └── Exit button
-├── TimelineStrip (StatelessWidget — CustomPainter)
+├── TimelineStrip (StatelessWidget → may become StatefulWidget for auto-scroll animation in US4, permitted by constitution II)
 │   └── NowMarker (StatelessWidget — countdown text)
 └── DetailArea (StatelessWidget — scrollable)
     ├── HeroCard (StatelessWidget — ongoing event)
