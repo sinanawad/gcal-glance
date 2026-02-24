@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gcal_glance/config/crt_theme.dart';
 import 'package:gcal_glance/screens/calendar_home_page.dart';
@@ -194,5 +195,104 @@ void main() {
       find.text('Sign-in was cancelled. Please try again.'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('S key toggles sim controls visibility', (tester) async {
+    FlutterError.onError = ignoreOverflowErrors;
+    addTearDown(() => FlutterError.onError = originalOnError);
+
+    final now = DateTime.now();
+    final event = calendar.Event()
+      ..summary = 'Test'
+      ..start = calendar.EventDateTime(dateTime: now.add(const Duration(hours: 1)))
+      ..end = calendar.EventDateTime(dateTime: now.add(const Duration(hours: 2)))
+      ..status = 'confirmed';
+
+    when(() => mockService.getAuthenticatedClient())
+        .thenAnswer((_) async => mockClient);
+    when(() => mockService.fetchEvents(any()))
+        .thenAnswer((_) async => [event]);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: CrtTheme.themeData(),
+        home: CalendarHomePage(calendarService: mockService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Sim controls hidden by default.
+    expect(find.text('+1h'), findsNothing);
+
+    // Press S to show them.
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+    await tester.pump();
+    expect(find.text('+1h'), findsOneWidget);
+
+    // Press S again to hide.
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyS);
+    await tester.pump();
+    expect(find.text('+1h'), findsNothing);
+  });
+
+  testWidgets('shows meeting countdown for next event with link',
+      (tester) async {
+    FlutterError.onError = ignoreOverflowErrors;
+    addTearDown(() => FlutterError.onError = originalOnError);
+
+    final now = DateTime.now();
+    final futureEvent = calendar.Event()
+      ..summary = 'Team Standup'
+      ..start = calendar.EventDateTime(dateTime: now.add(const Duration(hours: 1)))
+      ..end = calendar.EventDateTime(
+          dateTime: now.add(const Duration(hours: 1, minutes: 30)))
+      ..hangoutLink = 'https://meet.google.com/abc-defg-hij'
+      ..status = 'confirmed';
+
+    when(() => mockService.getAuthenticatedClient())
+        .thenAnswer((_) async => mockClient);
+    when(() => mockService.fetchEvents(any()))
+        .thenAnswer((_) async => [futureEvent]);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: CrtTheme.themeData(),
+        home: CalendarHomePage(calendarService: mockService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Should show the meeting name and a videocam icon.
+    expect(find.text('Team Standup'), findsWidgets);
+    expect(find.byIcon(Icons.videocam), findsWidgets);
+  });
+
+  testWidgets('shows NO MEETINGS when no events have links',
+      (tester) async {
+    FlutterError.onError = ignoreOverflowErrors;
+    addTearDown(() => FlutterError.onError = originalOnError);
+
+    final now = DateTime.now();
+    final noLinkEvent = calendar.Event()
+      ..summary = 'Lunch Break'
+      ..start = calendar.EventDateTime(dateTime: now.add(const Duration(hours: 2)))
+      ..end = calendar.EventDateTime(
+          dateTime: now.add(const Duration(hours: 3)))
+      ..status = 'confirmed';
+
+    when(() => mockService.getAuthenticatedClient())
+        .thenAnswer((_) async => mockClient);
+    when(() => mockService.fetchEvents(any()))
+        .thenAnswer((_) async => [noLinkEvent]);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: CrtTheme.themeData(),
+        home: CalendarHomePage(calendarService: mockService),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('NO MEETINGS'), findsOneWidget);
   });
 }

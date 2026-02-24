@@ -7,9 +7,9 @@ import 'package:gcal_glance/widgets/flip_clock.dart';
 
 class ClockColumn extends StatelessWidget {
   final ValueNotifier<DateTime> now;
-  final Widget? debugControls;
+  final Widget? bottomContent;
 
-  const ClockColumn({super.key, required this.now, this.debugControls});
+  const ClockColumn({super.key, required this.now, this.bottomContent});
 
   static const _weekdays = [
     'MONDAY',
@@ -66,7 +66,7 @@ class ClockColumn extends StatelessWidget {
                     Text(
                       weekday,
                       style: GoogleFonts.vt323(
-                        fontSize: 24,
+                        fontSize: 28,
                         color: CrtTheme.textPrimary,
                       ),
                       textAlign: TextAlign.center,
@@ -74,7 +74,7 @@ class ClockColumn extends StatelessWidget {
                     Text(
                       '$day $month $year',
                       style: GoogleFonts.vt323(
-                        fontSize: 22,
+                        fontSize: 26,
                         color: CrtTheme.textSecondary,
                       ),
                       textAlign: TextAlign.center,
@@ -83,9 +83,9 @@ class ClockColumn extends StatelessWidget {
                 );
               },
             ),
-            // Debug time controls or empty space
             const Spacer(),
-            ?debugControls,
+            ?bottomContent,
+            const Spacer(),
             // Exit button at the bottom
             Padding(
               padding: const EdgeInsets.only(bottom: 12),

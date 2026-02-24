@@ -37,23 +37,60 @@ class HeroCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  event.summary,
-                  style: GoogleFonts.vt323(
-                    fontSize: 22,
-                    color: CrtTheme.textPrimary,
-                  ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
                 Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Expanded(
+                      child: Text(
+                        event.summary,
+                        style: GoogleFonts.vt323(
+                          fontSize: 38,
+                          color: CrtTheme.textPrimary,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
                     Text(
-                      '$startHour:$startMin \u2192 $endHour:$endMin',
+                      '$startHour:$startMin\n$endHour:$endMin',
+                      textAlign: TextAlign.right,
                       style: GoogleFonts.vt323(
-                        fontSize: 16,
+                        fontSize: 19,
                         color: CrtTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: hasValidLink
+                            ? CrtTheme.joinActive
+                            : CrtTheme.joinDisabled,
+                        disabledBackgroundColor: CrtTheme.joinDisabled,
+                        disabledForegroundColor: CrtTheme.textSecondary,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: hasValidLink
+                          ? () => launchUrl(Uri.parse(event.meetingLink!))
+                          : null,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.videocam, size: 18, color: CrtTheme.textPrimary),
+                          const SizedBox(height: 4),
+                          Text(
+                            'JOIN',
+                            style: GoogleFonts.vt323(
+                              fontSize: 14,
+                              color: CrtTheme.textPrimary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
@@ -81,30 +118,6 @@ class HeroCard extends StatelessWidget {
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    icon: Icon(Icons.videocam, color: CrtTheme.textPrimary),
-                    label: Text(
-                      'JOIN',
-                      style: GoogleFonts.vt323(
-                        fontSize: 18,
-                        color: CrtTheme.textPrimary,
-                      ),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: hasValidLink
-                          ? CrtTheme.joinActive
-                          : CrtTheme.joinDisabled,
-                      disabledBackgroundColor: CrtTheme.joinDisabled,
-                      disabledForegroundColor: CrtTheme.textSecondary,
-                    ),
-                    onPressed: hasValidLink
-                        ? () => launchUrl(Uri.parse(event.meetingLink!))
-                        : null,
-                  ),
                 ),
               ],
             ),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:gcal_glance/config/crt_theme.dart';
 import 'package:gcal_glance/models/calendar_event.dart';
 import 'package:gcal_glance/services/google_calendar_service.dart';
@@ -32,6 +33,8 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
 
   /// Time simulation: offset from real time. Zero means real time.
   Duration _timeOffset = Duration.zero;
+  bool _showSimControls = false;
+  late final FocusNode _focusNode;
 
   DateTime get _simulatedNow => DateTime.now().add(_timeOffset);
 
@@ -52,6 +55,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
   @override
   void initState() {
     super.initState();
+    _focusNode = FocusNode();
     _checkCurrentUser();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _now.value = _simulatedNow;
@@ -60,11 +64,21 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _dataFetchTimer?.cancel();
     _clockTimer?.cancel();
     _now.dispose();
     widget.calendarService.dispose();
     super.dispose();
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.keyS) {
+      setState(() => _showSimControls = !_showSimControls);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   void _showErrorSnackBar(
@@ -206,6 +220,94 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     return ongoingEvents.first;
   }
 
+  /// Find the next future event with a meeting link.
+  CalendarEvent? _nextMeetingWithLink(DateTime now) {
+    final future = _events
+        .where((e) => e.startTime.isAfter(now) && e.meetingLink != null)
+        .toList();
+    if (future.isEmpty) return null;
+    future.sort((a, b) => a.startTime.compareTo(b.startTime));
+    return future.first;
+  }
+
+  Widget _buildMeetingCountdown() {
+    return ValueListenableBuilder<DateTime>(
+      valueListenable: _now,
+      builder: (context, now, _) {
+        final next = _nextMeetingWithLink(now);
+        if (next == null) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Text(
+              'NO MEETINGS',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.vt323(
+                fontSize: 18,
+                color: CrtTheme.textSecondary.withValues(alpha: 0.5),
+              ),
+            ),
+          );
+        }
+
+        final countdown = next.startTime.difference(now);
+        final hours = countdown.inHours;
+        final minutes = countdown.inMinutes.remainder(60);
+
+        final String timeText;
+        if (hours > 0) {
+          timeText = '${hours}h ${minutes}m';
+        } else {
+          timeText = '${minutes}m';
+        }
+
+        final status = next.status(now);
+        final Color accentColor;
+        switch (status) {
+          case EventStatus.ongoing:
+            accentColor = CrtTheme.ongoing;
+          case EventStatus.upcoming:
+            accentColor = CrtTheme.upcoming;
+          case EventStatus.normal:
+            accentColor = CrtTheme.normal;
+        }
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: accentColor.withValues(alpha: 0.5)),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.videocam, size: 28, color: accentColor),
+              const SizedBox(height: 4),
+              Text(
+                timeText,
+                style: GoogleFonts.vt323(
+                  fontSize: 36,
+                  color: accentColor,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                next.summary,
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.vt323(
+                  fontSize: 16,
+                  color: CrtTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   /// Filter events for today's timeline.
   List<CalendarEvent> _todayEvents(DateTime now) {
     return _events
@@ -227,8 +329,21 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _isLoggedIn ? _buildMainLayout() : _buildLoginScreen(),
+    return Focus(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: Scaffold(
+        body: Container(
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: const Color(0xFF5a5a9e),
+              width: 2,
+            ),
+          ),
+          child: _isLoggedIn ? _buildMainLayout() : _buildLoginScreen(),
+        ),
+      ),
     );
   }
 
@@ -317,7 +432,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     if (_events.isEmpty && !_hasCompletedFirstLoad) {
       return Row(
         children: [
-          ClockColumn(now: _now, debugControls: _buildTimeControls()),
+          ClockColumn(now: _now),
           const Expanded(
             child: Center(child: CircularProgressIndicator()),
           ),
@@ -328,7 +443,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     if (_events.isEmpty && _hasCompletedFirstLoad) {
       return Row(
         children: [
-          ClockColumn(now: _now, debugControls: _buildTimeControls()),
+          ClockColumn(now: _now),
           Expanded(
             child: Center(
               child: Text(
@@ -354,14 +469,23 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
         return Row(
           children: [
             // Left: Clock column (180px)
-            ClockColumn(now: _now, debugControls: _buildTimeControls()),
+            ClockColumn(now: _now, bottomContent: _buildMeetingCountdown()),
             // Right: Timeline strip + detail area
             Expanded(
               child: Column(
                 children: [
-                  // Top: Timeline strip (~100px)
-                  TimelineStrip(events: todayEvents, now: _now),
-                  // Bottom: Detail area (Expanded, scrollable)
+                  // Top spacer to align with clock column padding
+                  Container(height: 12, color: CrtTheme.background),
+                  // Timeline strip + time sim controls (press S to toggle)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TimelineStrip(events: todayEvents, now: _now),
+                      ),
+                      if (_showSimControls) _buildTimeControls(),
+                    ],
+                  ),
+                  // Detail area (Expanded, scrollable)
                   Expanded(
                     child: DetailArea(
                       events: detailEvents,

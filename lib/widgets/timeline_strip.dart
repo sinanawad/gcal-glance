@@ -20,11 +20,11 @@ class TimelineStrip extends StatelessWidget {
       valueListenable: now,
       builder: (context, currentTime, _) {
         return Container(
-          height: 100,
+          height: 88,
           color: CrtTheme.timelineBg,
           child: ClipRect(
             child: CustomPaint(
-              size: const Size(double.infinity, 100),
+              size: const Size(double.infinity, 88),
               painter: _TimelinePainter(
                 events: events,
                 now: currentTime,
@@ -133,7 +133,7 @@ class _TimelinePainter extends CustomPainter {
           final ox1 = _timeToX(overlapStart, size);
           final ox2 = _timeToX(overlapEnd, size);
           overlapRegions
-              .add(Rect.fromLTWH(ox1, 20, max(ox2 - ox1, 2.0), 60));
+              .add(Rect.fromLTWH(ox1, 18, max(ox2 - ox1, 2.0), 52));
         }
       }
     }
@@ -157,7 +157,7 @@ class _TimelinePainter extends CustomPainter {
       }
 
       // Alternating fill: even events are solid, odd events use horizontal lines.
-      final blockRect = Rect.fromLTWH(x1, 20, blockWidth, 60);
+      final blockRect = Rect.fromLTWH(x1, 18, blockWidth, 52);
       final rrect = RRect.fromRectAndRadius(blockRect, const Radius.circular(4));
 
       if (i.isEven) {
@@ -174,7 +174,7 @@ class _TimelinePainter extends CustomPainter {
         final stripePaint = Paint()
           ..color = statusColor.withValues(alpha: 0.5)
           ..strokeWidth = 2;
-        for (double y = 22; y < 80; y += 8) {
+        for (double y = 20; y < 70; y += 8) {
           canvas.drawLine(Offset(x1, y), Offset(x1 + blockWidth, y), stripePaint);
         }
         canvas.restore();
@@ -249,7 +249,7 @@ class _TimelinePainter extends CustomPainter {
       ongoingEvents.sort((a, b) => a.endTime.compareTo(b.endTime));
       final soonest = ongoingEvents.first;
       final countdown = soonest.endTime.difference(now);
-      text = 'ends ${countdown.inMinutes}m';
+      text = '${countdown.inMinutes}m';
     } else {
       final futureEvents =
           events.where((e) => e.startTime.isAfter(now)).toList();
@@ -268,13 +268,14 @@ class _TimelinePainter extends CustomPainter {
         text: TextSpan(
           text: text,
           style: GoogleFonts.vt323(
-            fontSize: 14,
+            fontSize: 22,
             color: CrtTheme.textPrimary,
           ),
         ),
         textDirection: TextDirection.ltr,
       )..layout();
-      textPainter.paint(canvas, Offset(nowX + 4, 16));
+      final textY = (size.height - textPainter.height) / 2;
+      textPainter.paint(canvas, Offset(nowX + 4, textY));
     }
   }
 
