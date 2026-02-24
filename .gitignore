@@ -47,8 +47,7 @@ app.*.symbols
 app.*.map.json
 
 # Secrets / credentials
-token.json
-go-gcal-cli-credentials.json
+lib/config/oauth_config.dart
 svc-keyfile.json
 *.keystore
 *.jks

@@ -1,4 +1,4 @@
-package com.example.gcal_app
+package coach.incremental.gcal_glance
 
 import io.flutter.embedding.android.FlutterActivity
 

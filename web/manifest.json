@@ -1,6 +1,6 @@
 {
-    "name": "gcal_app",
-    "short_name": "gcal_app",
+    "name": "gcal-glance",
+    "short_name": "gcal-glance",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
