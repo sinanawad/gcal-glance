@@ -150,4 +150,58 @@ void main() {
       expect(event.countdown(now), Duration.zero);
     });
   });
+
+  group('edge cases', () {
+    test('zero-duration event (startTime == endTime) returns normal status',
+        () {
+      final event = CalendarEvent(
+        summary: 'Instant',
+        startTime: DateTime(2026, 2, 24, 10, 0),
+        endTime: DateTime(2026, 2, 24, 10, 0),
+      );
+
+      expect(event.status(DateTime(2026, 2, 24, 10, 0)), EventStatus.normal);
+      expect(event.progress(DateTime(2026, 2, 24, 10, 0)), 0.0);
+      expect(event.countdown(DateTime(2026, 2, 24, 10, 0)), Duration.zero);
+    });
+
+    test('progress returns 0.0 for zero-duration event', () {
+      final event = CalendarEvent(
+        summary: 'Instant',
+        startTime: DateTime(2026, 2, 24, 10, 0),
+        endTime: DateTime(2026, 2, 24, 10, 0),
+      );
+
+      expect(event.progress(DateTime(2026, 2, 24, 9, 59)), 0.0);
+      expect(event.progress(DateTime(2026, 2, 24, 10, 1)), 0.0);
+    });
+
+    test('status transitions correctly at 10-minute boundary', () {
+      final event = CalendarEvent(
+        summary: 'Meeting',
+        startTime: DateTime(2026, 2, 24, 10, 0),
+        endTime: DateTime(2026, 2, 24, 11, 0),
+      );
+
+      // 10 min 1 sec before → normal
+      final justOutside = DateTime(2026, 2, 24, 9, 49, 59);
+      expect(event.status(justOutside), EventStatus.normal);
+
+      // 9 min 59 sec before → upcoming
+      final justInside = DateTime(2026, 2, 24, 9, 50, 1);
+      expect(event.status(justInside), EventStatus.upcoming);
+    });
+
+    test('short event is ongoing at midpoint', () {
+      final event = CalendarEvent(
+        summary: 'Quick sync',
+        startTime: DateTime(2026, 2, 24, 10, 0, 0),
+        endTime: DateTime(2026, 2, 24, 10, 0, 10),
+      );
+
+      final during = DateTime(2026, 2, 24, 10, 0, 5);
+      expect(event.status(during), EventStatus.ongoing);
+      expect(event.progress(during), closeTo(0.5, 0.01));
+    });
+  });
 }

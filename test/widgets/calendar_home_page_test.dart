@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gcal_glance/screens/calendar_home_page.dart';
 import 'package:gcal_glance/services/google_calendar_service.dart';
 import 'package:googleapis/calendar/v3.dart' as calendar;
+import 'package:googleapis_auth/googleapis_auth.dart' as auth;
 import 'package:http/http.dart' as http;
 import 'package:mocktail/mocktail.dart';
 
@@ -99,5 +101,71 @@ void main() {
     expect(find.text('No upcoming events'), findsOneWidget);
     expect(find.byIcon(Icons.refresh), findsOneWidget);
     expect(find.byType(CircularProgressIndicator), findsNothing);
+  });
+
+  testWidgets('shows SnackBar when fetchEvents throws network error',
+      (tester) async {
+    when(() => mockService.getAuthenticatedClient())
+        .thenAnswer((_) async => mockClient);
+    when(() => mockService.fetchEvents(any()))
+        .thenThrow(const SocketException('no internet'));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CalendarHomePage(calendarService: mockService),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Could not refresh events. Check your connection.'),
+      findsOneWidget,
+    );
+    expect(find.text('Retry'), findsOneWidget);
+  });
+
+  testWidgets('shows SnackBar when session expires', (tester) async {
+    when(() => mockService.getAuthenticatedClient())
+        .thenAnswer((_) async => mockClient);
+    when(() => mockService.fetchEvents(any()))
+        .thenThrow(auth.AccessDeniedException('expired'));
+    when(() => mockService.signOut()).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CalendarHomePage(calendarService: mockService),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Session expired. Please sign in again.'),
+      findsOneWidget,
+    );
+    // Should have signed out and show sign-in button again.
+    expect(find.text('Sign in with Google'), findsOneWidget);
+  });
+
+  testWidgets('shows SnackBar when sign-in fails', (tester) async {
+    when(() => mockService.getAuthenticatedClient())
+        .thenAnswer((_) async => null);
+    when(() => mockService.signIn(any())).thenThrow(Exception('cancelled'));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: CalendarHomePage(calendarService: mockService),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sign in with Google'));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Sign-in was cancelled. Please try again.'),
+      findsOneWidget,
+    );
   });
 }

@@ -60,7 +60,8 @@ class EventList extends StatelessWidget {
               nowNotifier: nowNotifier,
               backgroundColorFor: (status) =>
                   _getGroupBackgroundColor(status, groupIndex),
-              onJoinMeeting: event.meetingLink != null
+              onJoinMeeting: event.meetingLink != null &&
+                      Uri.tryParse(event.meetingLink!)?.scheme == 'https'
                   ? () => launchUrl(Uri.parse(event.meetingLink!))
                   : null,
             ),
