@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -52,12 +53,28 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
   }
 
   Future<void> _handleSignIn() async {
-    final client = await widget.calendarService.signIn();
-    if (client != null) {
-      setState(() {
-        _isLoggedIn = true;
-      });
-      _startPolling();
+    try {
+      final client = await widget.calendarService.signIn(
+        (url) {
+          Process.start('xdg-open', [url]).then((process) {
+            process.exitCode.then((code) {
+              if (code != 0) {
+                debugPrint('xdg-open exited with code $code');
+              }
+            });
+          }).catchError((Object e) {
+            debugPrint('Failed to open browser: $e');
+          });
+        },
+      );
+      if (client != null) {
+        setState(() {
+          _isLoggedIn = true;
+        });
+        _startPolling();
+      }
+    } catch (e) {
+      debugPrint('signIn error: $e');
     }
   }
 

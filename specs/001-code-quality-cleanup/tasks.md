@@ -73,13 +73,13 @@ description: "Task list for code quality cleanup feature"
 
 ### Implementation for User Story 1
 
-- [ ] T025 [US1] Create lib/config/oauth_config.dart with actual embedded `clientId` and `clientSecret` constants from the developer's Google Cloud project (file is gitignored)
-- [ ] T026 [US1] Implement secure token storage in lib/services/google_calendar_service.dart: `_saveCredentials(AccessCredentials)` writes serialized JSON to `FlutterSecureStorage` under key `gcal_oauth_token`. `_loadSavedCredentials()` reads and deserializes from secure storage. `_clearCredentials()` deletes the key
-- [ ] T027 [US1] Implement `signIn()` in lib/services/google_calendar_service.dart: use embedded `ClientId` from oauth_config.dart, call `obtainAccessCredentialsViaUserConsent()` with `calendarReadonlyScope` and `launchUrl` callback. Save credentials to secure storage. Create `AutoRefreshingAuthClient` and listen to `credentialUpdates` stream to persist refreshed tokens
-- [ ] T028 [US1] Implement `signOut()`: close `_client`, cancel `_credentialUpdatesSubscription`, call `_clearCredentials()`, close underlying HTTP clients
-- [ ] T029 [US1] Implement `getAuthenticatedClient()`: return cached `_client` if available, otherwise attempt to load from secure storage. If loaded, create `AutoRefreshingAuthClient` and subscribe to `credentialUpdates`. Handle corrupted data gracefully (clear and return null)
-- [ ] T030 [US1] Update lib/screens/calendar_home_page.dart `dispose()` to close HTTP clients via service. Remove all references to `go-gcal-cli-credentials.json` and `token.json` from the codebase
-- [ ] T031 [US1] Add test in test/services/google_calendar_service_test.dart: mock `FlutterSecureStorage`, verify `_loadSavedCredentials` returns null when storage is empty, verify `_clearCredentials` deletes the key on sign-out
+- [x] T025 [US1] Create lib/config/oauth_config.dart with actual embedded `clientId` and `clientSecret` constants from the developer's Google Cloud project (file is gitignored)
+- [x] T026 [US1] Implement secure token storage in lib/services/google_calendar_service.dart: `_saveCredentials(AccessCredentials)` writes serialized JSON to `FlutterSecureStorage` under key `gcal_oauth_token`. `_loadSavedCredentials()` reads and deserializes from secure storage. `_clearCredentials()` deletes the key
+- [x] T027 [US1] Implement `signIn()` in lib/services/google_calendar_service.dart: use embedded `ClientId` from oauth_config.dart, call `obtainAccessCredentialsViaUserConsent()` with `calendarReadonlyScope` and `launchUrl` callback. Save credentials to secure storage. Create `AutoRefreshingAuthClient` and listen to `credentialUpdates` stream to persist refreshed tokens
+- [x] T028 [US1] Implement `signOut()`: close `_client`, cancel `_credentialUpdatesSubscription`, call `_clearCredentials()`, close underlying HTTP clients
+- [x] T029 [US1] Implement `getAuthenticatedClient()`: return cached `_client` if available, otherwise attempt to load from secure storage. If loaded, create `AutoRefreshingAuthClient` and subscribe to `credentialUpdates`. Handle corrupted data gracefully (clear and return null)
+- [x] T030 [US1] Update lib/screens/calendar_home_page.dart `dispose()` to close HTTP clients via service. Remove all references to `go-gcal-cli-credentials.json` and `token.json` from the codebase
+- [x] T031 [US1] Add test in test/services/google_calendar_service_test.dart: mock `FlutterSecureStorage`, verify `_loadSavedCredentials` returns null when storage is empty, verify `_clearCredentials` deletes the key on sign-out
 
 **Checkpoint**: Auth works via embedded credentials + browser flow. Tokens stored in libsecret. Refresh persisted. HTTP clients properly closed.
 

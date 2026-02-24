@@ -9,6 +9,10 @@ class MockGoogleCalendarService extends Mock implements GoogleCalendarService {}
 void main() {
   late MockGoogleCalendarService mockService;
 
+  setUpAll(() {
+    registerFallbackValue((String _) {});
+  });
+
   setUp(() {
     mockService = MockGoogleCalendarService();
   });
@@ -32,7 +36,7 @@ void main() {
   testWidgets('calls signIn when sign-in button is tapped', (tester) async {
     when(() => mockService.getAuthenticatedClient())
         .thenAnswer((_) async => null);
-    when(() => mockService.signIn()).thenAnswer((_) async => null);
+    when(() => mockService.signIn(any())).thenAnswer((_) async => null);
 
     await tester.pumpWidget(
       MaterialApp(
@@ -44,6 +48,6 @@ void main() {
     await tester.tap(find.text('Sign in with Google'));
     await tester.pumpAndSettle();
 
-    verify(() => mockService.signIn()).called(1);
+    verify(() => mockService.signIn(any())).called(1);
   });
 }

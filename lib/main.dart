@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:gcal_glance/config/oauth_config.dart';
 import 'package:gcal_glance/screens/calendar_home_page.dart';
 import 'package:gcal_glance/services/google_calendar_service.dart';
 import 'package:googleapis_auth/googleapis_auth.dart' as auth;
@@ -17,7 +18,7 @@ class MyApp extends StatelessWidget {
     final calendarService = GoogleCalendarService(
       httpClientFactory: () => http.Client(),
       secureStorage: const FlutterSecureStorage(),
-      clientId: auth.ClientId('placeholder', 'placeholder'),
+      clientId: auth.ClientId(oauthClientId, oauthClientSecret),
     );
 
     return MaterialApp(
