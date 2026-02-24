@@ -18,7 +18,8 @@ The user glances at the app on their secondary portrait monitor to see the curre
 **Acceptance Scenarios**:
 
 1. **Given** the user is signed in with events loaded, **When** they glance at the app, **Then** the flip clock on the left shows the current time (HH:MM), the date is displayed below it (day-of-week, day, month, year), and the timeline strip shows all events as colored blocks with truncated titles
-2. **Given** events span the working day, **When** the timeline renders, **Then** event blocks are positioned proportionally by time, with hour markers along the top, and a NOW marker (vertical line) indicates the current position
+2. **Given** events span the working day, **When** the timeline renders, **Then** event blocks are positioned proportionally by time, with hour markers along the top, a NOW marker (vertical line) indicates the current position, and the visible range shows one past event plus all future events
+3. **Given** an event just ended, **When** the timeline updates, **Then** it smoothly scrolls so the ended event is the single past event visible on the left edge
 3. **Given** the app is running, **When** one minute passes, **Then** the flip clock updates with an animation and the NOW marker shifts position
 
 ---
@@ -82,7 +83,7 @@ The entire app uses a dark CRT-inspired color palette with a deep navy-black bac
 **Acceptance Scenarios**:
 
 1. **Given** the app launches, **When** the UI renders, **Then** the background is deep navy-black (#1a1a2e), text is bright (#e0e0e0), and the timeline strip background is darker (#0d0d1a)
-2. **Given** the flip clock is displayed, **When** digits change, **Then** the clock flaps are dark slate (#2d2d44) with bright white digits (#e0e0e0)
+2. **Given** the flip clock is displayed, **When** a digit changes, **Then** the top half of the old digit flap rotates down to reveal the new digit (split-flap animation), with dark slate flaps (#2d2d44) and bright white digits (#e0e0e0)
 3. **Given** events have different statuses, **When** they render, **Then** ongoing events are phosphor blue (#4fc3f7), upcoming events are warm amber (#ffb74d), and normal events are dim green (#66bb6a)
 
 ---
@@ -90,22 +91,33 @@ The entire app uses a dark CRT-inspired color palette with a deep navy-black bac
 ### Edge Cases
 
 - What happens when no events are loaded? The detail area shows "No upcoming events" text in the retro style, and the timeline strip is empty with only hour markers and the NOW marker visible
-- What happens when events overlap (same time slot)? Overlapping events stack in the timeline (multiple thin blocks) and appear as separate rows in the detail area, grouped together
+- What happens when events overlap (same time slot)? Overlapping events stack in the timeline (multiple thin blocks) and appear as separate rows in the detail area, grouped together. When multiple events are ongoing, the one ending soonest gets the hero card; other ongoing events appear as blue-accented compact rows
 - What happens when an event title is very long? Titles are truncated with ellipsis in both the timeline blocks and the detail compact rows. The hero card can show more of the title due to its larger size
 - How does the layout handle the transition from today to tomorrow? A "Tomorrow" separator appears in the detail list between today's and tomorrow's events, consistent with existing behavior
 - What happens when the user is not signed in? The sign-in screen uses the same dark CRT background with a styled "Sign in with Google" button
+
+## Clarifications
+
+### Session 2026-02-24
+
+- Q: When multiple events are ongoing simultaneously, which gets the hero card? → A: The event ending soonest gets the hero card (most time-sensitive); other ongoing events appear as compact rows with blue accent.
+- Q: What time range should the timeline display? → A: Dynamic with auto-scroll. The timeline always shows exactly one past event (the most recently ended) plus all future events. When a meeting ends, the timeline smoothly scrolls so the newly-ended event becomes the single past event shown. Before any meeting ends, the timeline starts from the first event of the day.
+- Q: How elaborate should the flip clock animation be? → A: Classic split-flap flip animation — top half of the flap rotates down to reveal the new digit underneath, mimicking a physical departure board.
+- Q: How should the retro pixel font be sourced? → A: Use the google_fonts package with "Press Start 2P" for timeline block titles and "VT323" for other retro text (compact rows, date display, general UI text).
+- Q: Should the detail area show past events? → A: No. Detail area shows only ongoing + future events. The one past event is visible in the timeline strip only, providing context without consuming detail area space.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: App MUST display a split-flap flip clock in a left column (~180px wide) spanning the full window height, showing hours and minutes with the current date stacked below
-- **FR-002**: App MUST display a horizontal timeline strip (~100px tall) in the top-right area with hour markers, proportionally positioned event blocks, and a NOW marker
-- **FR-003**: Timeline event blocks MUST show truncated event titles in a small pixel-style font, color-coded by event status (ongoing=blue, upcoming=amber, normal=green)
+- **FR-001**: App MUST display a split-flap flip clock in a left column (~180px wide) spanning the full window height, showing hours and minutes with the current date stacked below. Digit transitions MUST use a split-flap flip animation (top half rotates down to reveal new digit)
+- **FR-002**: App MUST display a horizontal timeline strip (~100px tall) in the top-right area with hour markers, proportionally positioned event blocks, and a NOW marker. The visible range MUST be dynamic: showing one most-recently-ended event plus all future events. Before any event ends, the range starts from the first event of the day
+- **FR-013**: The timeline MUST auto-scroll smoothly when a meeting ends, so that the newly-ended event becomes the single past event visible on the left edge
+- **FR-003**: Timeline event blocks MUST show truncated event titles in "Press Start 2P" pixel font (small size), color-coded by event status (ongoing=blue, upcoming=amber, normal=green). Other retro text (compact rows, date, general UI) MUST use "VT323" font. Both sourced via the google_fonts package
 - **FR-004**: The NOW marker on the timeline MUST display contextual countdown text: "ends in Xm" during ongoing events or "next in Xm" when the next event is approaching
-- **FR-005**: App MUST display a scrollable detail area (~350px tall) below the timeline, showing a hero card for the ongoing event and compact rows for other events
+- **FR-005**: App MUST display a scrollable detail area (~350px tall) below the timeline, showing a hero card for the ongoing event (when multiple ongoing, the one ending soonest) and compact rows for other events
 - **FR-006**: The hero card MUST show: event title, time range, progress bar with percentage, and a JOIN button (red with meeting link, grey without)
-- **FR-007**: Compact event rows MUST show: status indicator, event title, time range, and countdown to start
+- **FR-007**: Compact event rows MUST show: status indicator, event title, time range, and countdown to start. Detail area MUST only display ongoing and future events (past events appear in the timeline strip only)
 - **FR-008**: App MUST use the dark CRT color palette as defined in the design (background #1a1a2e, ongoing #4fc3f7, upcoming #ffb74d, normal #66bb6a, clock flaps #2d2d44, text #e0e0e0)
 - **FR-009**: All existing functionality MUST be preserved: OAuth authentication, token storage, event fetching/polling, error handling via SnackBars, meeting link opening
 - **FR-010**: The flip clock MUST update every second (consistent with existing clock behavior)
