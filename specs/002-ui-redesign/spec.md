@@ -105,13 +105,15 @@ The entire app uses a dark CRT-inspired color palette with a deep navy-black bac
 - Q: How elaborate should the flip clock animation be? → A: Classic split-flap flip animation — top half of the flap rotates down to reveal the new digit underneath, mimicking a physical departure board.
 - Q: How should the retro pixel font be sourced? → A: Use the google_fonts package with "Press Start 2P" for timeline block titles and "VT323" for other retro text (compact rows, date display, general UI text).
 - Q: Should the detail area show past events? → A: No. Detail area shows only ongoing + future events. The one past event is visible in the timeline strip only, providing context without consuming detail area space.
+- Q: Should tomorrow's events appear on the timeline strip? → A: No. The timeline shows today's events only. Tomorrow's events appear exclusively in the detail area's scrollable list (with a "Tomorrow" separator).
+- Q: Where should the exit button live in the new layout (no app bar)? → A: Bottom of the clock column, below the date. Small exit icon, accessible but unobtrusive.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
-- **FR-001**: App MUST display a split-flap flip clock in a left column (~180px wide) spanning the full window height, showing hours and minutes with the current date stacked below. Digit transitions MUST use a split-flap flip animation (top half rotates down to reveal new digit)
-- **FR-002**: App MUST display a horizontal timeline strip (~100px tall) in the top-right area with hour markers, proportionally positioned event blocks, and a NOW marker. The visible range MUST be dynamic: showing one most-recently-ended event plus all future events. Before any event ends, the range starts from the first event of the day
+- **FR-001**: App MUST display a split-flap flip clock in a left column (~180px wide) spanning the full window height, showing hours and minutes with the current date stacked below, and an exit button at the bottom of the column. Digit transitions MUST use a split-flap flip animation (top half rotates down to reveal new digit)
+- **FR-002**: App MUST display a horizontal timeline strip (~100px tall) in the top-right area with hour markers, proportionally positioned event blocks, and a NOW marker. The timeline MUST show today's events only (tomorrow's events appear in the detail area only). The visible range MUST be dynamic: showing one most-recently-ended event plus all remaining today events. Before any event ends, the range starts from the first event of the day
 - **FR-013**: The timeline MUST auto-scroll smoothly when a meeting ends, so that the newly-ended event becomes the single past event visible on the left edge
 - **FR-003**: Timeline event blocks MUST show truncated event titles in "Press Start 2P" pixel font (small size), color-coded by event status (ongoing=blue, upcoming=amber, normal=green). Other retro text (compact rows, date, general UI) MUST use "VT323" font. Both sourced via the google_fonts package
 - **FR-004**: The NOW marker on the timeline MUST display contextual countdown text: "ends in Xm" during ongoing events or "next in Xm" when the next event is approaching
@@ -126,7 +128,7 @@ The entire app uses a dark CRT-inspired color palette with a deep navy-black bac
 
 ### Key Entities
 
-- **Clock Column**: Left-side panel (~180px) containing the flip clock digits and date display, spanning full window height
+- **Clock Column**: Left-side panel (~180px) containing the flip clock digits, date display, and exit button at the bottom, spanning full window height
 - **Timeline Strip**: Horizontal bar showing proportionally-spaced event blocks with titles, hour markers, and a NOW marker with countdown
 - **Hero Card**: Prominent display card for the currently ongoing event, showing full details, progress bar, and JOIN action
 - **Compact Event Row**: Single-line event entry for non-ongoing events in the detail area, showing essential info and countdown
