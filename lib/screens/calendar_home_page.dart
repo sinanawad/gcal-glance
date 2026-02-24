@@ -19,32 +19,35 @@ class CalendarHomePage extends StatefulWidget {
 
 class _CalendarHomePageState extends State<CalendarHomePage> {
   bool _isLoggedIn = false;
+  bool _isLoading = false;
+  bool _hasCompletedFirstLoad = false;
   List<CalendarEvent> _events = [];
   Timer? _dataFetchTimer;
-  Timer? _uiUpdateTimer;
+
+  final ValueNotifier<DateTime> _now = ValueNotifier(DateTime.now());
+  Timer? _clockTimer;
 
   @override
   void initState() {
     super.initState();
     _checkCurrentUser();
-    _uiUpdateTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (mounted) {
-        setState(() {});
-      }
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      _now.value = DateTime.now();
     });
   }
 
   @override
   void dispose() {
     _dataFetchTimer?.cancel();
-    _uiUpdateTimer?.cancel();
+    _clockTimer?.cancel();
+    _now.dispose();
     widget.calendarService.dispose();
     super.dispose();
   }
 
   Future<void> _checkCurrentUser() async {
     final client = await widget.calendarService.getAuthenticatedClient();
-    if (client != null) {
+    if (client != null && mounted) {
       setState(() {
         _isLoggedIn = true;
       });
@@ -82,6 +85,8 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     await widget.calendarService.signOut();
     setState(() {
       _isLoggedIn = false;
+      _isLoading = false;
+      _hasCompletedFirstLoad = false;
       _events = [];
       _dataFetchTimer?.cancel();
     });
@@ -96,7 +101,11 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
 
   Future<void> _updateEvents() async {
     final httpClient = await widget.calendarService.getAuthenticatedClient();
-    if (httpClient == null) return;
+    if (httpClient == null || !mounted) return;
+
+    setState(() {
+      _isLoading = true;
+    });
 
     try {
       final apiEvents = await widget.calendarService.fetchEvents(httpClient);
@@ -114,11 +123,17 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
       if (mounted) {
         setState(() {
           _events = newEvents;
+          _isLoading = false;
+          _hasCompletedFirstLoad = true;
         });
       }
     } catch (e) {
       // US3 will add proper error handling with SnackBars
       if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasCompletedFirstLoad = true;
+        });
         _handleSignOut();
       }
     }
@@ -126,11 +141,9 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final now = DateTime.now();
-
     return Scaffold(
       appBar: AppBar(
-        title: Center(child: ClockWidget(now: now)),
+        title: Center(child: ClockWidget(nowNotifier: _now)),
         actions: [
           if (_isLoggedIn)
             IconButton(
@@ -148,7 +161,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
       ),
       body: Container(
         color: Colors.grey[700],
-        child: _isLoggedIn ? _buildEventList(now) : _buildLoginScreen(),
+        child: _isLoggedIn ? _buildEventList() : _buildLoginScreen(),
       ),
     );
   }
@@ -162,11 +175,31 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     );
   }
 
-  Widget _buildEventList(DateTime now) {
-    if (_events.isEmpty) {
+  Widget _buildEventList() {
+    if (_events.isEmpty && !_hasCompletedFirstLoad) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return EventList(events: _events, now: now);
+    if (_events.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'No upcoming events',
+              style: TextStyle(color: Colors.white, fontSize: 18),
+            ),
+            const SizedBox(height: 16),
+            IconButton(
+              icon: const Icon(Icons.refresh, color: Colors.white, size: 32),
+              onPressed: _isLoading ? null : _updateEvents,
+              tooltip: 'Refresh',
+            ),
+          ],
+        ),
+      );
+    }
+
+    return EventList(events: _events, nowNotifier: _now);
   }
 }

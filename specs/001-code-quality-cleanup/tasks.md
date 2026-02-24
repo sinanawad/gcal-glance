@@ -93,12 +93,12 @@ description: "Task list for code quality cleanup feature"
 
 ### Implementation for User Story 2
 
-- [ ] T032 [US2] Create a `ValueNotifier<DateTime>` in lib/screens/calendar_home_page.dart. Initialize it in `initState()` with a `Timer.periodic(1 second)` that updates the notifier. Remove the existing `_uiUpdateTimer` that calls `setState(() {})`
-- [ ] T033 [US2] Wrap the clock widget in lib/widgets/clock_widget.dart with `ValueListenableBuilder<DateTime>` so it rebuilds only when the notifier ticks, not on full scaffold rebuild
-- [ ] T034 [US2] Update lib/widgets/event_list.dart: pass `ValueNotifier<DateTime>` to event list. Wrap each event card's countdown text and status indicator in `ValueListenableBuilder<DateTime>` so countdowns update per-second without rebuilding the entire list
-- [ ] T035 [US2] Update lib/widgets/event_card.dart: accept `DateTime now` from the `ValueListenableBuilder` parent. Call `event.status(now)` and `event.countdown(now)` at render time instead of reading a cached `event.status` field
-- [ ] T036 [US2] Implement empty state in lib/screens/calendar_home_page.dart: when `_events.isEmpty` and `_isLoggedIn` and `_hasCompletedFirstLoad`, show a "No upcoming events" text + refresh `IconButton` instead of `CircularProgressIndicator`. Add `_isLoading` flag to distinguish loading from empty
-- [ ] T037 [US2] Add test in test/models/calendar_event_test.dart: verify `status(now)` returns `ongoing` when `now` is between start and end, `upcoming` when within 10 minutes, `normal` otherwise. Verify `progress(now)` returns correct fraction
+- [x] T032 [US2] Create a `ValueNotifier<DateTime>` in lib/screens/calendar_home_page.dart. Initialize it in `initState()` with a `Timer.periodic(1 second)` that updates the notifier. Remove the existing `_uiUpdateTimer` that calls `setState(() {})`
+- [x] T033 [US2] Wrap the clock widget in lib/widgets/clock_widget.dart with `ValueListenableBuilder<DateTime>` so it rebuilds only when the notifier ticks, not on full scaffold rebuild
+- [x] T034 [US2] Update lib/widgets/event_list.dart: pass `ValueNotifier<DateTime>` to event list. Wrap each event card's countdown text and status indicator in `ValueListenableBuilder<DateTime>` so countdowns update per-second without rebuilding the entire list
+- [x] T035 [US2] Update lib/widgets/event_card.dart: accept `DateTime now` from the `ValueListenableBuilder` parent. Call `event.status(now)` and `event.countdown(now)` at render time instead of reading a cached `event.status` field
+- [x] T036 [US2] Implement empty state in lib/screens/calendar_home_page.dart: when `_events.isEmpty` and `_isLoggedIn` and `_hasCompletedFirstLoad`, show a "No upcoming events" text + refresh `IconButton` instead of `CircularProgressIndicator`. Add `_isLoading` flag to distinguish loading from empty
+- [x] T037 [US2] Add test in test/models/calendar_event_test.dart: verify `status(now)` returns `ongoing` when `now` is between start and end, `upcoming` when within 10 minutes, `normal` otherwise. Verify `progress(now)` returns correct fraction
 
 **Checkpoint**: Clock and countdowns rebuild per-second via ValueNotifier. Event cards are static between polls. Empty state is distinct from loading.
 

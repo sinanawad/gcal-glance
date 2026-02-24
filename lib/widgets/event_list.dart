@@ -5,9 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 
 class EventList extends StatelessWidget {
   final List<CalendarEvent> events;
-  final DateTime now;
+  final ValueNotifier<DateTime> nowNotifier;
 
-  const EventList({super.key, required this.events, required this.now});
+  const EventList({super.key, required this.events, required this.nowNotifier});
 
   @override
   Widget build(BuildContext context) {
@@ -32,12 +32,6 @@ class EventList extends StatelessWidget {
             previousEvent.startTime.day != event.startTime.day;
 
         final groupIndex = groupIndices[index];
-        final eventStatus = event.status(now);
-
-        final groupBackgroundColor = _getGroupBackgroundColor(
-          eventStatus,
-          groupIndex,
-        );
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -63,8 +57,9 @@ class EventList extends StatelessWidget {
               ),
             EventCard(
               event: event,
-              now: now,
-              backgroundColor: groupBackgroundColor,
+              nowNotifier: nowNotifier,
+              backgroundColorFor: (status) =>
+                  _getGroupBackgroundColor(status, groupIndex),
               onJoinMeeting: event.meetingLink != null
                   ? () => launchUrl(Uri.parse(event.meetingLink!))
                   : null,
