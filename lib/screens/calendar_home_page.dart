@@ -7,6 +7,8 @@ import 'package:gcal_glance/models/calendar_event.dart';
 import 'package:gcal_glance/services/google_calendar_service.dart';
 import 'package:gcal_glance/widgets/clock_widget.dart';
 import 'package:gcal_glance/widgets/event_list.dart';
+import 'package:googleapis_auth/googleapis_auth.dart' as auth;
+import 'package:http/http.dart' as http;
 
 class CalendarHomePage extends StatefulWidget {
   final GoogleCalendarService calendarService;
@@ -45,6 +47,24 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     super.dispose();
   }
 
+  void _showErrorSnackBar(
+    String message, {
+    String? actionLabel,
+    VoidCallback? onAction,
+  }) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        behavior: SnackBarBehavior.floating,
+        width: 400,
+        action: actionLabel != null
+            ? SnackBarAction(label: actionLabel, onPressed: onAction ?? () {})
+            : null,
+      ),
+    );
+  }
+
   Future<void> _checkCurrentUser() async {
     final client = await widget.calendarService.getAuthenticatedClient();
     if (client != null && mounted) {
@@ -62,11 +82,11 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
           Process.start('xdg-open', [url]).then((process) {
             process.exitCode.then((code) {
               if (code != 0) {
-                debugPrint('xdg-open exited with code $code');
+                _showErrorSnackBar('Failed to open browser.');
               }
             });
           }).catchError((Object e) {
-            debugPrint('Failed to open browser: $e');
+            _showErrorSnackBar('Failed to open browser.');
           });
         },
       );
@@ -76,8 +96,8 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
         });
         _startPolling();
       }
-    } catch (e) {
-      debugPrint('signIn error: $e');
+    } catch (_) {
+      _showErrorSnackBar('Sign-in was cancelled. Please try again.');
     }
   }
 
@@ -127,14 +147,38 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
           _hasCompletedFirstLoad = true;
         });
       }
-    } catch (e) {
-      // US3 will add proper error handling with SnackBars
+    } on auth.AccessDeniedException {
       if (mounted) {
         setState(() {
           _isLoading = false;
           _hasCompletedFirstLoad = true;
         });
+        _showErrorSnackBar('Session expired. Please sign in again.');
         _handleSignOut();
+      }
+    } on SocketException {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasCompletedFirstLoad = true;
+        });
+        _showErrorSnackBar(
+          'Could not refresh events. Check your connection.',
+          actionLabel: 'Retry',
+          onAction: _updateEvents,
+        );
+      }
+    } on http.ClientException {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _hasCompletedFirstLoad = true;
+        });
+        _showErrorSnackBar(
+          'Could not refresh events. Check your connection.',
+          actionLabel: 'Retry',
+          onAction: _updateEvents,
+        );
       }
     }
   }
