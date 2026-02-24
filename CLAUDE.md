@@ -54,8 +54,13 @@ lib/
 5. On first run, browser opens for Google sign-in; token persisted to secure storage
 
 ## Recent Changes
+- 002-ui-redesign: Added Dart 3.11.0 / Flutter 3.41.2 + googleapis 16.x, googleapis_auth 2.x, flutter_secure_storage 10.x, url_launcher 6.x, google_fonts (NEW)
 
 - 001-code-quality-cleanup: App renamed to gcal-glance, restructured into standard Flutter layout, constructor-injected service, derived model status, precomputed group indices
 
 <!-- MANUAL ADDITIONS START -->
 <!-- MANUAL ADDITIONS END -->
+
+## Active Technologies
+- Dart 3.11.0 / Flutter 3.41.2 + googleapis 16.x, googleapis_auth 2.x, flutter_secure_storage 10.x, url_launcher 6.x, google_fonts (NEW) (002-ui-redesign)
+- flutter_secure_storage (libsecret on Linux) — unchanged (002-ui-redesign)
