@@ -8,11 +8,27 @@ class TimelineStrip extends StatelessWidget {
   final List<CalendarEvent> events;
   final ValueNotifier<DateTime> now;
 
+  /// NOW is always at 25% of the width.
+  static const double _nowFraction = 0.25;
+
+  /// Total viewport span: 5 hours.
+  static const int _viewportMinutes = 5 * 60;
+
   const TimelineStrip({
     super.key,
     required this.events,
     required this.now,
   });
+
+  double _timeToX(DateTime time, DateTime currentTime, double width) {
+    final viewportStart = currentTime
+        .subtract(Duration(minutes: (_nowFraction * _viewportMinutes).round()));
+    final minutes = time.difference(viewportStart).inMinutes;
+    return (minutes / _viewportMinutes) * width;
+  }
+
+  String _formatTime(DateTime t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
   @override
   Widget build(BuildContext context) {
@@ -23,12 +39,58 @@ class TimelineStrip extends StatelessWidget {
           height: 88,
           color: CrtTheme.timelineBg,
           child: ClipRect(
-            child: CustomPaint(
-              size: const Size(double.infinity, 88),
-              painter: _TimelinePainter(
-                events: events,
-                now: currentTime,
-              ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final width = constraints.maxWidth;
+                return Stack(
+                  children: [
+                    CustomPaint(
+                      size: Size(width, 88),
+                      painter: _TimelinePainter(
+                        events: events,
+                        now: currentTime,
+                      ),
+                    ),
+                    // Tooltip hit regions for each event block.
+                    for (final event in events)
+                      () {
+                        final x1 = _timeToX(
+                            event.startTime, currentTime, width);
+                        final x2 = _timeToX(
+                            event.endTime, currentTime, width);
+                        final blockWidth = max(x2 - x1, 2.0);
+                        // Clamp to visible area.
+                        final left = x1.clamp(0.0, width);
+                        final right = (x1 + blockWidth).clamp(0.0, width);
+                        if (right - left < 1) return const SizedBox.shrink();
+                        return Positioned(
+                          left: left,
+                          top: 18,
+                          width: right - left,
+                          height: 52,
+                          child: Tooltip(
+                            message:
+                                '${event.summary}\n${_formatTime(event.startTime)} \u2192 ${_formatTime(event.endTime)}',
+                            waitDuration: const Duration(milliseconds: 800),
+                            textStyle: GoogleFonts.vt323(
+                              fontSize: 16,
+                              color: CrtTheme.textPrimary,
+                            ),
+                            decoration: BoxDecoration(
+                              color: CrtTheme.clockFlap,
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: CrtTheme.textSecondary
+                                    .withValues(alpha: 0.4),
+                              ),
+                            ),
+                            child: const SizedBox.expand(),
+                          ),
+                        );
+                      }(),
+                  ],
+                );
+              },
             ),
           ),
         );

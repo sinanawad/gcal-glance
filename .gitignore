@@ -51,3 +51,5 @@ lib/config/oauth_config.dart
 svc-keyfile.json
 *.keystore
 *.jks
+go-gcal-cli-credentials.json
+token.json

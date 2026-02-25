@@ -14,11 +14,13 @@ gcal-glance is an always-on calendar display designed to sit in the corner of yo
 ### Features
 
 - **Animated flip clock** with VT323 monospace font and split-flap digit transitions
-- **5-hour scrolling timeline** with event blocks, overlap hatching, and a live NOW marker
+- **5-hour scrolling timeline** with event blocks, overlap hatching, hover tooltips, and a live NOW marker fixed at 25% width
 - **Color-coded event status** — cyan (ongoing), amber (starts in <10 min), green (later)
+- **RSVP-aware display** — tentative/unresponded meetings get crosshatch overlays; declined meetings are hidden entirely
+- **Smart hero cards** — accepted ongoing meetings with Google Meet links get hero treatment; dual/multi hero when overlapping; tentative only promoted when no accepted meetings are active
 - **Next meeting countdown** below the clock with Google Meet detection
 - **Hero card** for the current meeting with progress bar and one-click JOIN button
-- **Compact event list** with time, title, and status-colored indicators
+- **Compact event list** with time, title, status-colored indicators, and hover tooltips on timeline blocks
 - **Auto-refresh** every 60 seconds with graceful error handling
 - **Secure OAuth** — tokens stored via libsecret, auto-refreshed silently
 - **Time simulation mode** (press `S`) for demoing and debugging
@@ -76,7 +78,7 @@ lib/
     crt_theme.dart                 CRT color palette and Material 3 theme
     oauth_config.example.dart      OAuth credential template
   models/
-    calendar_event.dart            CalendarEvent model with status/progress/countdown
+    calendar_event.dart            CalendarEvent model with status/progress/countdown/RSVP
     time_utils.dart                Duration formatting helpers
   services/
     google_calendar_service.dart   OAuth flow, token storage, Calendar API client
