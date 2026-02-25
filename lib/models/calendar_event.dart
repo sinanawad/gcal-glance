@@ -10,6 +10,9 @@ class CalendarEvent {
   final DateTime endTime;
   final String? meetingLink;
   final ResponseStatus responseStatus;
+  final String calendarId;
+  final bool isPrimary;
+  final int? calendarColorValue; // ARGB int from Google hex color
 
   const CalendarEvent({
     required this.summary,
@@ -17,6 +20,9 @@ class CalendarEvent {
     required this.endTime,
     this.meetingLink,
     this.responseStatus = ResponseStatus.accepted,
+    this.calendarId = 'primary',
+    this.isPrimary = true,
+    this.calendarColorValue,
   });
 
   /// Whether the user's response is tentative or needsAction.
@@ -27,7 +33,23 @@ class CalendarEvent {
   /// Whether the user has accepted the event (or is organizer with no attendees).
   bool get isAccepted => responseStatus == ResponseStatus.accepted;
 
-  factory CalendarEvent.fromGoogleEvent(calendar.Event event) {
+  /// Whether this event belongs to a secondary (non-primary) calendar.
+  bool get isSecondary => !isPrimary;
+
+  /// Parses a Google Calendar hex color string (e.g. "#0088aa") to an ARGB int.
+  static int? parseHexColor(String? hex) {
+    if (hex == null || hex.isEmpty) return null;
+    final cleaned = hex.replaceFirst('#', '');
+    if (cleaned.length != 6) return null;
+    return int.tryParse('FF$cleaned', radix: 16);
+  }
+
+  factory CalendarEvent.fromGoogleEvent(
+    calendar.Event event, {
+    String calendarId = 'primary',
+    bool isPrimary = true,
+    int? calendarColorValue,
+  }) {
     // Find the authenticated user's attendee record via self == true.
     // If no attendees list (personal event), defaults to accepted.
     final selfAttendee = event.attendees
@@ -52,6 +74,9 @@ class CalendarEvent {
       endTime: event.end!.dateTime!.toLocal(),
       meetingLink: event.hangoutLink,
       responseStatus: responseStatus,
+      calendarId: calendarId,
+      isPrimary: isPrimary,
+      calendarColorValue: calendarColorValue,
     );
   }
 

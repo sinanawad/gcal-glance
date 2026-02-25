@@ -5,12 +5,14 @@ import 'package:gcal_glance/models/calendar_event.dart';
 /// as implemented in CalendarHomePage._selectHeroEvents and _updateEvents.
 /// The logic is replicated here as pure functions for unit testability.
 
-/// Mirrors CalendarHomePage._selectHeroEvents.
+/// Mirrors CalendarHomePage._selectHeroEvents (primary-only).
 List<CalendarEvent> selectHeroEvents(
     List<CalendarEvent> events, DateTime now) {
   final ongoingWithLink = events
-      .where(
-          (e) => e.status(now) == EventStatus.ongoing && e.meetingLink != null)
+      .where((e) =>
+          e.isPrimary &&
+          e.status(now) == EventStatus.ongoing &&
+          e.meetingLink != null)
       .toList();
   if (ongoingWithLink.isEmpty) return [];
 
@@ -219,6 +221,42 @@ void main() {
       final heroes = selectHeroEvents(events, now);
       expect(heroes.length, 2);
       expect(heroes.map((e) => e.summary), ['Accepted 1', 'Accepted 2']);
+    });
+
+    test('secondary calendar events excluded from hero', () {
+      final events = [
+        makeEvent(
+          summary: 'Primary Meeting',
+          link: 'https://meet.google.com/primary',
+        ),
+        CalendarEvent(
+          summary: 'Secondary Meeting',
+          startTime: DateTime(2026, 2, 25, 10, 0),
+          endTime: DateTime(2026, 2, 25, 11, 0),
+          meetingLink: 'https://meet.google.com/secondary',
+          calendarId: 'shared@group.calendar.google.com',
+          isPrimary: false,
+        ),
+      ];
+
+      final heroes = selectHeroEvents(events, now);
+      expect(heroes.length, 1);
+      expect(heroes.first.summary, 'Primary Meeting');
+    });
+
+    test('no hero when only secondary events have links', () {
+      final events = [
+        CalendarEvent(
+          summary: 'Secondary Only',
+          startTime: DateTime(2026, 2, 25, 10, 0),
+          endTime: DateTime(2026, 2, 25, 11, 0),
+          meetingLink: 'https://meet.google.com/sec',
+          calendarId: 'shared@group.calendar.google.com',
+          isPrimary: false,
+        ),
+      ];
+
+      expect(selectHeroEvents(events, now), isEmpty);
     });
 
     test('ongoing without link excluded even if accepted', () {

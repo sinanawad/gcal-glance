@@ -63,11 +63,12 @@ class TimelineStrip extends StatelessWidget {
                         final left = x1.clamp(0.0, width);
                         final right = (x1 + blockWidth).clamp(0.0, width);
                         if (right - left < 1) return const SizedBox.shrink();
+                        final isSecondary = event.isSecondary;
                         return Positioned(
                           left: left,
-                          top: 18,
+                          top: isSecondary ? 80 : 18,
                           width: right - left,
-                          height: 52,
+                          height: isSecondary ? 8 : 52,
                           child: Tooltip(
                             message:
                                 '${event.summary}\n${_formatTime(event.startTime)} \u2192 ${_formatTime(event.endTime)}',
@@ -185,6 +186,8 @@ class _TimelinePainter extends CustomPainter {
       for (var j = i + 1; j < sorted.length; j++) {
         final a = sorted[i];
         final b = sorted[j];
+        // Only mark overlaps between primary events.
+        if (a.isSecondary || b.isSecondary) continue;
         // Overlap exists if a.start < b.end && b.start < a.end
         if (a.startTime.isBefore(b.endTime) &&
             b.startTime.isBefore(a.endTime)) {
@@ -211,14 +214,32 @@ class _TimelinePainter extends CustomPainter {
       final blockWidth = max(x2 - x1, 2.0);
 
       final status = event.status(now);
+
+      // Secondary events use their faded Google Calendar color.
       final Color statusColor;
-      switch (status) {
-        case EventStatus.ongoing:
-          statusColor = CrtTheme.ongoing;
-        case EventStatus.upcoming:
-          statusColor = CrtTheme.upcoming;
-        case EventStatus.normal:
-          statusColor = CrtTheme.normal;
+      if (event.isSecondary && event.calendarColorValue != null) {
+        statusColor =
+            CrtTheme.fadedCalendarColor(event.calendarColorValue!);
+      } else {
+        switch (status) {
+          case EventStatus.ongoing:
+            statusColor = CrtTheme.ongoing;
+          case EventStatus.upcoming:
+            statusColor = CrtTheme.upcoming;
+          case EventStatus.normal:
+            statusColor = CrtTheme.normal;
+        }
+      }
+
+      // Secondary events: thin bar at the bottom of the timeline.
+      if (event.isSecondary) {
+        final barRect = Rect.fromLTWH(x1, 85, blockWidth, 3);
+        final barRRect =
+            RRect.fromRectAndRadius(barRect, const Radius.circular(1));
+        final fillPaint = Paint()
+          ..color = statusColor.withValues(alpha: 0.7);
+        canvas.drawRRect(barRRect, fillPaint);
+        continue;
       }
 
       // Fill pattern: tentative=crosshatch, accepted=alternating solid/stripe.
@@ -227,7 +248,8 @@ class _TimelinePainter extends CustomPainter {
 
       if (event.isTentative) {
         // Tentative: crosshatch (diagonal grid) pattern
-        final fillPaint = Paint()..color = statusColor.withValues(alpha: 0.15);
+        final fillPaint = Paint()
+          ..color = statusColor.withValues(alpha: 0.15);
         canvas.drawRRect(rrect, fillPaint);
 
         canvas.save();
@@ -245,12 +267,14 @@ class _TimelinePainter extends CustomPainter {
         canvas.restore();
       } else if (acceptedIndex.isEven) {
         // Solid fill
-        final fillPaint = Paint()..color = statusColor.withValues(alpha: 0.55);
+        final fillPaint = Paint()
+          ..color = statusColor.withValues(alpha: 0.55);
         canvas.drawRRect(rrect, fillPaint);
         acceptedIndex++;
       } else {
         // Horizontal stripe fill
-        final fillPaint = Paint()..color = statusColor.withValues(alpha: 0.25);
+        final fillPaint = Paint()
+          ..color = statusColor.withValues(alpha: 0.25);
         canvas.drawRRect(rrect, fillPaint);
 
         canvas.save();

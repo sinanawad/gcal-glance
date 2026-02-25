@@ -8,6 +8,7 @@ import 'package:googleapis_auth/googleapis_auth.dart' as auth;
 import 'package:http/http.dart' as http;
 
 const _storageKey = 'gcal_oauth_token';
+const _selectedCalendarsKey = 'gcal_selected_calendars';
 const _scopes = [calendar.CalendarApi.calendarReadonlyScope];
 
 /// Manages OAuth lifecycle, secure token storage, and authenticated API access.
@@ -141,6 +142,7 @@ class GoogleCalendarService {
     _client?.close();
     _client = null;
     await _clearCredentials();
+    await secureStorage.delete(key: _selectedCalendarsKey);
   }
 
   /// Closes any open HTTP clients. Call from widget dispose().
@@ -149,6 +151,43 @@ class GoogleCalendarService {
     _credentialUpdatesSubscription = null;
     _client?.close();
     _client = null;
+  }
+
+  /// Fetches all calendars visible to the authenticated user.
+  /// Returns entries sorted with primary first, then alphabetically.
+  Future<List<calendar.CalendarListEntry>> fetchCalendarList(
+    http.Client client,
+  ) async {
+    final calendarApi = calendar.CalendarApi(client);
+    final list = await calendarApi.calendarList.list();
+    final items = list.items ?? [];
+    items.sort((a, b) {
+      if (a.primary == true && b.primary != true) return -1;
+      if (b.primary == true && a.primary != true) return 1;
+      return (a.summaryOverride ?? a.summary ?? '')
+          .compareTo(b.summaryOverride ?? b.summary ?? '');
+    });
+    return items;
+  }
+
+  /// Saves the set of selected calendar IDs to secure storage.
+  Future<void> saveSelectedCalendars(List<String> calendarIds) async {
+    await secureStorage.write(
+      key: _selectedCalendarsKey,
+      value: jsonEncode(calendarIds),
+    );
+  }
+
+  /// Loads previously selected calendar IDs from secure storage.
+  /// Returns null if nothing was saved (first run).
+  Future<List<String>?> loadSelectedCalendars() async {
+    final raw = await secureStorage.read(key: _selectedCalendarsKey);
+    if (raw == null) return null;
+    try {
+      return (jsonDecode(raw) as List<dynamic>).cast<String>();
+    } catch (_) {
+      return null;
+    }
   }
 
   /// Fetches events from the given calendar ID for today and tomorrow.

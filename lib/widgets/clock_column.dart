@@ -8,8 +8,16 @@ import 'package:gcal_glance/widgets/flip_clock.dart';
 class ClockColumn extends StatelessWidget {
   final ValueNotifier<DateTime> now;
   final Widget? bottomContent;
+  final bool isMuted;
+  final VoidCallback? onToggleMute;
 
-  const ClockColumn({super.key, required this.now, this.bottomContent});
+  const ClockColumn({
+    super.key,
+    required this.now,
+    this.bottomContent,
+    this.isMuted = false,
+    this.onToggleMute,
+  });
 
   static const _weekdays = [
     'MONDAY',
@@ -86,14 +94,31 @@ class ClockColumn extends StatelessWidget {
             const Spacer(),
             ?bottomContent,
             const Spacer(),
-            // Exit button at the bottom
+            // Mute + Exit buttons at the bottom
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: IconButton(
-                icon: const Icon(Icons.exit_to_app),
-                color: CrtTheme.textSecondary,
-                iconSize: 20,
-                onPressed: () => SystemNavigator.pop(),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (onToggleMute != null)
+                    IconButton(
+                      icon: Icon(
+                        isMuted ? Icons.volume_off : Icons.volume_up,
+                      ),
+                      color: isMuted
+                          ? CrtTheme.joinActive.withValues(alpha: 0.7)
+                          : CrtTheme.textSecondary,
+                      iconSize: 20,
+                      onPressed: onToggleMute,
+                      tooltip: isMuted ? 'Unmute (M)' : 'Mute (M)',
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.exit_to_app),
+                    color: CrtTheme.textSecondary,
+                    iconSize: 20,
+                    onPressed: () => SystemNavigator.pop(),
+                  ),
+                ],
               ),
             ),
           ],

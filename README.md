@@ -18,6 +18,7 @@ gcal-glance is an always-on calendar display designed to sit in the corner of yo
 - **Color-coded event status** — cyan (ongoing), amber (starts in <10 min), green (later)
 - **RSVP-aware display** — tentative/unresponded meetings get crosshatch overlays; declined meetings are hidden entirely
 - **Smart hero cards** — accepted ongoing meetings with Google Meet links get hero treatment; dual/multi hero when overlapping; tentative only promoted when no accepted meetings are active
+- **Multi-calendar support** — press `C` to select additional calendars; secondary events appear faded with their Google Calendar color
 - **Next meeting countdown** below the clock with Google Meet detection
 - **Hero card** for the current meeting with progress bar and one-click JOIN button
 - **Compact event list** with time, title, status-colored indicators, and hover tooltips on timeline blocks

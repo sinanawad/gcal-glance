@@ -25,6 +25,18 @@ class CrtTheme {
   static const Color joinActive = Color(0xFFef5350);
   static const Color joinDisabled = Color(0xFF757575);
 
+  /// Converts a Google Calendar color (ARGB int) to a CRT-faded version.
+  /// Blends toward textSecondary for a muted, CRT-appropriate tone.
+  static Color fadedCalendarColor(int colorValue, {double alpha = 0.7}) {
+    final original = Color(colorValue);
+    // Desaturate by blending 60% original + 40% textSecondary grey.
+    // Color.r/g/b return 0.0-1.0 doubles; scale back to 0-255 for fromRGBO.
+    final r = ((original.r * 0.6 + textSecondary.r * 0.4) * 255).round();
+    final g = ((original.g * 0.6 + textSecondary.g * 0.4) * 255).round();
+    final b = ((original.b * 0.6 + textSecondary.b * 0.4) * 255).round();
+    return Color.fromRGBO(r, g, b, alpha);
+  }
+
   /// Returns a status color for the given [EventStatus] string.
   static Color statusColor(String status) {
     switch (status) {

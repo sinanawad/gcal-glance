@@ -2,7 +2,7 @@
 
 **Feature Branch**: `002-ui-redesign`
 **Created**: 2026-02-24
-**Status**: Implemented (v2 — tentative meetings + dual hero)
+**Status**: Implemented (v3 — multi-calendar support)
 **Input**: User description: "Custom desktop app with fixed 1436x462 window, no decorations, on portrait monitor. Explore eye-candy redesign with better readability, better use of space, and a more visually appealing clock and event layout. Retro/pixel art aesthetic."
 
 ## User Scenarios & Testing *(mandatory)*
@@ -117,12 +117,33 @@ The user needs to distinguish at a glance between meetings they've accepted and 
 
 ---
 
+### User Story 7 - Multi-Calendar Support with Faded Secondary Events (Priority: P2)
+
+The user wants to see events from additional calendars (team, shared, etc.) alongside their primary calendar. Pressing 'C' opens a CRT-styled overlay picker showing all available calendars with checkboxes. The primary calendar is always selected (locked). Secondary calendar events appear in the timeline and compact event rows with faded styling using their Google Calendar color, so they're visible but clearly secondary. Hero cards and meeting countdowns are exclusive to the primary calendar. Selected calendars are persisted across restarts.
+
+**Why this priority**: Many users have team calendars they want to track without cluttering the primary view. The faded styling provides visual distinction without overwhelming the display.
+
+**Independent Test**: Can be tested by signing in with multiple calendars, pressing 'C' to open the picker, toggling secondary calendars on/off, and verifying: secondary events appear faded in timeline and compact rows, hero cards remain primary-only, selection persists across restarts.
+
+**Acceptance Scenarios**:
+
+1. **Given** the user is signed in, **When** they press 'C', **Then** a CRT-styled overlay appears listing all calendars with checkboxes, each with a colored dot matching its Google Calendar color (faded for CRT theme)
+2. **Given** the calendar picker is open, **When** the user toggles a secondary calendar on, **Then** events from that calendar appear in the timeline and compact event rows with faded styling (50% alpha in timeline, 18px font and dimmed colors in compact rows)
+3. **Given** the primary calendar, **When** the picker shows it, **Then** its checkbox is always checked and disabled — it cannot be unchecked
+4. **Given** secondary calendar events are displayed, **When** hero card selection runs, **Then** only primary calendar events are considered for hero cards and meeting countdown
+5. **Given** the user selects calendars, **When** they close the picker and restart the app, **Then** the same calendar selection is restored from secure storage
+6. **Given** the user presses 'C' or 'ESC', **When** the picker is open, **Then** it closes
+7. **Given** the user signs out, **When** they sign back in, **Then** the calendar selection is cleared (starts fresh)
+
+---
+
 ### Edge Cases
 
 - What happens when no events are loaded? The detail area shows "No upcoming events" text in the retro style, and the timeline strip is empty with only hour markers and the NOW marker visible
 - What happens when events overlap (same time slot)? Overlapping events show as separate colored blocks in the timeline with diagonal hatching on the overlap region, and appear as separate rows in the detail area grouped together. When multiple accepted ongoing events have meeting links, ALL get hero cards (compact mode). If only tentative events are ongoing, the one ending soonest gets the hero card. Accepted always take priority over tentative for hero promotion
 - What happens with tentative/unresponded meetings? They render with a crosshatch background overlay in both compact rows and timeline blocks. Tentative events only get hero card treatment when no accepted ongoing events with links exist. Events with `needsAction` response status are treated identically to `tentative`
 - What happens with declined meetings? Declined events are completely filtered out during data fetching and never appear anywhere in the UI
+- What happens with secondary calendar events? They appear in the timeline and compact event rows with faded styling (50% alpha multiplier in timeline, 18px font with dimmed colors in rows) using their Google Calendar color (blended 60/40 with textSecondary). They are excluded from hero cards, meeting countdown, and the "NO MEETINGS" indicator. The same event on different calendars is distinguished by `calendarId` in `_isSameEvent`
 - What happens when an event title is very long? Titles are truncated with ellipsis in the detail compact rows. The hero card can show more of the title (up to 2 lines) due to its larger size. Timeline blocks show no titles
 - How does the layout handle the transition from today to tomorrow? A "Tomorrow" separator with darker background and bold text appears in the detail list between today's and tomorrow's events
 - What happens when the user is not signed in? The sign-in screen uses the same dark CRT background with a styled "Sign in with Google" button
@@ -149,6 +170,12 @@ The user needs to distinguish at a glance between meetings they've accepted and 
 - Q: What about declined events? → A: Filtered out completely during data fetch. Never shown anywhere.
 - Q: How is the user's response status determined? → A: From the Google Calendar API `attendees` array, finding the entry with `self == true` and reading its `responseStatus`. Personal events (no attendees) default to "accepted".
 
+### Session 2026-02-25 (multi-calendar)
+
+- Q: Should secondary calendar events get hero card treatment? → A: No. Hero cards and meeting countdown are exclusively for primary calendar events.
+- Q: How should calendar selection be persisted? → A: Via `flutter_secure_storage`, same as OAuth tokens. Key: `gcal_selected_calendars`, stored as JSON array of calendar IDs.
+- Q: What color should secondary events use? → A: Their Google Calendar color (`backgroundColor` from the API), blended 60/40 with textSecondary grey via `CrtTheme.fadedCalendarColor()`. Alpha reduced by 50% in timeline blocks.
+
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
@@ -161,6 +188,7 @@ The user needs to distinguish at a glance between meetings they've accepted and 
 - **FR-006**: The hero card MUST show: event title, time range, progress bar with percentage, and a JOIN button (red with meeting link). Only events with meeting links get hero card treatment. Tentative hero cards MUST show an amber border and "TENTATIVE" label. When multiple hero cards are shown, they MUST use compact mode (24px title, single-line, reduced padding)
 - **FR-007**: Compact event rows MUST show: status icon (videocam for ongoing, notifications_active for upcoming, event for normal), event title, time range, and countdown to start. Rows MUST have a 3px colored left border matching status. Rows MUST use alternating group backgrounds (dark slate / base background) with separator lines between time groups. Events with meeting links MUST display in 24px bold; events without MUST display in 20px normal with dimmer colors (60% alpha). Tentative/needsAction events MUST have a crosshatch overlay (bidirectional diagonal lines at 12% alpha) and slightly dimmed title (70% alpha). Time range, countdown, and join icon columns MUST be fixed-width and right-aligned for consistent alignment. Detail area MUST only display ongoing and future events
 - **FR-015**: App MUST track the user's RSVP response status per event via the `attendees[].self == true` entry from the Google Calendar API. Events with `responseStatus == 'declined'` MUST be completely filtered out. Events with `tentative` or `needsAction` MUST be visually distinguished with crosshatch patterns. Personal events (no attendees) default to accepted
+- **FR-016**: App MUST support multi-calendar display. Pressing 'C' MUST toggle a CRT-styled overlay listing all calendars with checkboxes and colored dots. The primary calendar MUST be always selected and locked. Secondary calendar events MUST appear faded in the timeline (50% alpha multiplier, faded Google Calendar color) and in compact rows (18px font, textSecondary 0.5 alpha titles, 0.08 alpha calendar color background). Hero cards and meeting countdown MUST only consider primary calendar events. Selected calendars MUST be persisted via `flutter_secure_storage` (key: `gcal_selected_calendars`). Pressing 'C' or 'ESC' MUST close the picker. Sign-out MUST clear the selection
 - **FR-008**: App MUST use the dark CRT color palette (background #1a1a2e, timelineBg #0d0d1a, ongoing #4fc3f7, upcoming #ffb74d, normal #66bb6a, clock flaps #2d2d44, text #e0e0e0, textSecondary #b0b0b0, joinActive #ef5350)
 - **FR-009**: All existing functionality MUST be preserved: OAuth authentication, token storage, event fetching/polling, error handling via SnackBars, meeting link opening
 - **FR-010**: The flip clock MUST update every second (consistent with existing clock behavior)

@@ -21,7 +21,8 @@ class DetailArea extends StatelessWidget {
   bool _isSameEvent(CalendarEvent a, CalendarEvent b) {
     return a.startTime == b.startTime &&
         a.endTime == b.endTime &&
-        a.summary == b.summary;
+        a.summary == b.summary &&
+        a.calendarId == b.calendarId;
   }
 
   bool _isSameTimeSlot(CalendarEvent a, CalendarEvent b) {

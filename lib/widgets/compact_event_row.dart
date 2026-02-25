@@ -34,21 +34,33 @@ class CompactEventRow extends StatelessWidget {
         final Color statusColor;
         final Color bgColor;
         final IconData statusIcon;
-        switch (status) {
-          case EventStatus.ongoing:
-            statusColor = CrtTheme.ongoing;
-            bgColor = CrtTheme.ongoing.withValues(alpha: 0.15);
-            statusIcon = Icons.videocam;
-          case EventStatus.upcoming:
-            statusColor = CrtTheme.upcoming;
-            bgColor = CrtTheme.upcoming.withValues(alpha: 0.12);
-            statusIcon = Icons.notifications_active;
-          case EventStatus.normal:
-            statusColor = CrtTheme.normal;
-            bgColor = isEvenGroup
-                ? CrtTheme.clockFlap.withValues(alpha: 0.4)
-                : CrtTheme.background;
-            statusIcon = Icons.event;
+
+        // Secondary events use their Google Calendar faded color.
+        final calColor = event.isSecondary && event.calendarColorValue != null
+            ? CrtTheme.fadedCalendarColor(event.calendarColorValue!)
+            : null;
+
+        if (event.isSecondary) {
+          statusColor = calColor ?? CrtTheme.textSecondary;
+          bgColor = statusColor.withValues(alpha: 0.08);
+          statusIcon = Icons.event;
+        } else {
+          switch (status) {
+            case EventStatus.ongoing:
+              statusColor = CrtTheme.ongoing;
+              bgColor = CrtTheme.ongoing.withValues(alpha: 0.15);
+              statusIcon = Icons.videocam;
+            case EventStatus.upcoming:
+              statusColor = CrtTheme.upcoming;
+              bgColor = CrtTheme.upcoming.withValues(alpha: 0.12);
+              statusIcon = Icons.notifications_active;
+            case EventStatus.normal:
+              statusColor = CrtTheme.normal;
+              bgColor = isEvenGroup
+                  ? CrtTheme.clockFlap.withValues(alpha: 0.4)
+                  : CrtTheme.background;
+              statusIcon = Icons.event;
+          }
         }
 
         final startHour = event.startTime.hour.toString().padLeft(2, '0');
@@ -79,18 +91,33 @@ class CompactEventRow extends StatelessWidget {
             Uri.tryParse(event.meetingLink!)?.scheme == 'https';
         final hasMeetingLink = event.meetingLink != null;
 
-        // Events without a meeting link get smaller font and dimmer colors.
-        final double titleFontSize = hasMeetingLink ? 24 : 20;
-        final double timeFontSize = hasMeetingLink ? 24 : 18;
-        final double countdownFontSize = hasMeetingLink ? 22 : 18;
-        final Color titleColor = hasMeetingLink
-            ? (event.isTentative
-                ? CrtTheme.textPrimary.withValues(alpha: 0.7)
-                : CrtTheme.textPrimary)
-            : CrtTheme.textSecondary;
-        final Color timeColor = hasMeetingLink
-            ? CrtTheme.textSecondary
-            : CrtTheme.textSecondary.withValues(alpha: 0.6);
+        // Secondary events always get faded treatment; primary events
+        // without meeting links get smaller font.
+        final double titleFontSize;
+        final double timeFontSize;
+        final double countdownFontSize;
+        final Color titleColor;
+        final Color timeColor;
+
+        if (event.isSecondary) {
+          titleFontSize = 18;
+          timeFontSize = 18;
+          countdownFontSize = 18;
+          titleColor = calColor ?? CrtTheme.textSecondary.withValues(alpha: 0.5);
+          timeColor = CrtTheme.textSecondary.withValues(alpha: 0.4);
+        } else {
+          titleFontSize = hasMeetingLink ? 24 : 20;
+          timeFontSize = hasMeetingLink ? 24 : 18;
+          countdownFontSize = hasMeetingLink ? 22 : 18;
+          titleColor = hasMeetingLink
+              ? (event.isTentative
+                  ? CrtTheme.textPrimary.withValues(alpha: 0.7)
+                  : CrtTheme.textPrimary)
+              : CrtTheme.textSecondary;
+          timeColor = hasMeetingLink
+              ? CrtTheme.textSecondary
+              : CrtTheme.textSecondary.withValues(alpha: 0.6);
+        }
 
         final rowContent = Container(
           decoration: BoxDecoration(

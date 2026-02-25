@@ -257,6 +257,64 @@ void main() {
     });
   });
 
+  group('multi-calendar fields', () {
+    test('defaults to primary calendar', () {
+      final event = CalendarEvent(
+        summary: 'Meeting',
+        startTime: DateTime(2026, 2, 25, 10, 0),
+        endTime: DateTime(2026, 2, 25, 11, 0),
+      );
+
+      expect(event.calendarId, 'primary');
+      expect(event.isPrimary, true);
+      expect(event.isSecondary, false);
+      expect(event.calendarColorValue, isNull);
+    });
+
+    test('isSecondary is true when isPrimary is false', () {
+      final event = CalendarEvent(
+        summary: 'Team Event',
+        startTime: DateTime(2026, 2, 25, 10, 0),
+        endTime: DateTime(2026, 2, 25, 11, 0),
+        calendarId: 'team@group.calendar.google.com',
+        isPrimary: false,
+        calendarColorValue: 0xFF0088AA,
+      );
+
+      expect(event.isPrimary, false);
+      expect(event.isSecondary, true);
+      expect(event.calendarId, 'team@group.calendar.google.com');
+      expect(event.calendarColorValue, 0xFF0088AA);
+    });
+  });
+
+  group('parseHexColor', () {
+    test('parses standard 6-digit hex with hash', () {
+      expect(CalendarEvent.parseHexColor('#0088aa'), 0xFF0088AA);
+    });
+
+    test('parses 6-digit hex without hash', () {
+      expect(CalendarEvent.parseHexColor('ff5500'), 0xFFFF5500);
+    });
+
+    test('returns null for null input', () {
+      expect(CalendarEvent.parseHexColor(null), isNull);
+    });
+
+    test('returns null for empty string', () {
+      expect(CalendarEvent.parseHexColor(''), isNull);
+    });
+
+    test('returns null for wrong length', () {
+      expect(CalendarEvent.parseHexColor('#fff'), isNull);
+      expect(CalendarEvent.parseHexColor('#aabbccdd'), isNull);
+    });
+
+    test('returns null for invalid hex characters', () {
+      expect(CalendarEvent.parseHexColor('#gggggg'), isNull);
+    });
+  });
+
   group('fromGoogleEvent RSVP mapping', () {
     calendar.Event makeGoogleEvent({
       String? selfResponseStatus,
@@ -338,6 +396,31 @@ void main() {
         makeGoogleEvent(selfResponseStatus: 'accepted'),
       );
       expect(event.meetingLink, 'https://meet.google.com/abc-def-ghi');
+    });
+
+    test('passes through calendar metadata', () {
+      final event = CalendarEvent.fromGoogleEvent(
+        makeGoogleEvent(selfResponseStatus: 'accepted'),
+        calendarId: 'shared@group.calendar.google.com',
+        isPrimary: false,
+        calendarColorValue: 0xFF00AA88,
+      );
+
+      expect(event.calendarId, 'shared@group.calendar.google.com');
+      expect(event.isPrimary, false);
+      expect(event.isSecondary, true);
+      expect(event.calendarColorValue, 0xFF00AA88);
+    });
+
+    test('defaults to primary when no calendar metadata provided', () {
+      final event = CalendarEvent.fromGoogleEvent(
+        makeGoogleEvent(selfResponseStatus: 'accepted'),
+      );
+
+      expect(event.calendarId, 'primary');
+      expect(event.isPrimary, true);
+      expect(event.isSecondary, false);
+      expect(event.calendarColorValue, isNull);
     });
   });
 }
