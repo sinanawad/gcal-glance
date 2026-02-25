@@ -23,22 +23,29 @@ Package name: `gcal_glance` | Display name: `gcal-glance` | Domain: `coach.incre
 lib/
 ├── main.dart                        # Entry point, MaterialApp shell
 ├── config/
+│   ├── crt_theme.dart               # CRT color palette + ThemeData factory
 │   └── oauth_config.example.dart    # OAuth credential template (copy to oauth_config.dart)
 ├── models/
-│   ├── calendar_event.dart          # CalendarEvent + EventStatus enum
+│   ├── calendar_event.dart          # CalendarEvent + EventStatus + ResponseStatus enums
 │   └── time_utils.dart              # Duration formatting helper
 ├── services/
 │   └── google_calendar_service.dart # OAuth, secure token storage, API client
 ├── widgets/
-│   ├── clock_widget.dart            # Live clock
-│   ├── event_card.dart              # Single event card
-│   └── event_list.dart              # Grouped event list with precomputed indices
+│   ├── clock_column.dart            # Left column: flip clock, date, meeting countdown, exit
+│   ├── flip_clock.dart              # HH:MM flip clock composition
+│   ├── flip_digit.dart              # Single split-flap digit with animation
+│   ├── hero_card.dart               # Hero card for ongoing meetings (compact/full, tentative)
+│   ├── compact_event_row.dart       # Compact event row with status border + crosshatch
+│   ├── detail_area.dart             # Hero cards + scrollable compact event list
+│   └── timeline_strip.dart          # Fixed-NOW sliding 5-hour timeline
 └── screens/
-    └── calendar_home_page.dart      # Main screen composition
+    └── calendar_home_page.dart      # Main screen composition + time simulation
 ```
 
 **Key patterns**:
 - Models are plain Dart (no Flutter imports), immutable, with derived status computed at read time via `status(DateTime now)`
+- `ResponseStatus` enum tracks RSVP state (accepted/tentative/needsAction/declined); declined filtered out, tentative gets crosshatch overlay
+- `ValueNotifier<DateTime>` drives per-second scoped rebuilds (clock, timeline, countdowns)
 - Services accept dependencies via constructor injection for testability
 - OAuth credentials embedded as compiled constants (gitignored `oauth_config.dart`)
 - Tokens stored securely via `flutter_secure_storage` (libsecret on Linux)

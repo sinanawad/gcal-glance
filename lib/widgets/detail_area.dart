@@ -8,13 +8,13 @@ import 'package:gcal_glance/widgets/compact_event_row.dart';
 
 class DetailArea extends StatelessWidget {
   final List<CalendarEvent> events;
-  final CalendarEvent? heroEvent;
+  final List<CalendarEvent> heroEvents;
   final ValueNotifier<DateTime> now;
 
   const DetailArea({
     super.key,
     required this.events,
-    this.heroEvent,
+    this.heroEvents = const [],
     required this.now,
   });
 
@@ -34,15 +34,21 @@ class DetailArea extends StatelessWidget {
     return ValueListenableBuilder<DateTime>(
       valueListenable: now,
       builder: (context, currentTime, _) {
-        final filteredEvents = heroEvent != null
-            ? events.where((e) => !_isSameEvent(e, heroEvent!)).toList()
+        // Exclude hero events from the compact list.
+        final filteredEvents = heroEvents.isNotEmpty
+            ? events
+                .where(
+                    (e) => !heroEvents.any((h) => _isSameEvent(e, h)))
+                .toList()
             : List<CalendarEvent>.of(events);
 
         // Compute group indices for alternating colors.
         int currentGroup = 0;
         final groupIndices = <int>[];
         for (var i = 0; i < filteredEvents.length; i++) {
-          if (i > 0 && !_isSameTimeSlot(filteredEvents[i - 1], filteredEvents[i])) {
+          if (i > 0 &&
+              !_isSameTimeSlot(
+                  filteredEvents[i - 1], filteredEvents[i])) {
             currentGroup++;
           }
           groupIndices.add(currentGroup);
@@ -55,14 +61,12 @@ class DetailArea extends StatelessWidget {
             final prevDate = filteredEvents[i - 1].startTime;
             final currDate = filteredEvents[i].startTime;
 
-            // "Tomorrow" separator when crossing day boundary.
             if (_isSameDay(prevDate, currentTime) &&
                 _isSameDay(
                     currDate, currentTime.add(const Duration(days: 1)))) {
               items.add(_DetailItem.tomorrowSeparator());
-            }
-            // Time-group separator when start time changes within the same day.
-            else if (!_isSameTimeSlot(filteredEvents[i - 1], filteredEvents[i])) {
+            } else if (!_isSameTimeSlot(
+                filteredEvents[i - 1], filteredEvents[i])) {
               items.add(_DetailItem.groupSeparator());
             }
           } else if (filteredEvents.isNotEmpty &&
@@ -73,9 +77,12 @@ class DetailArea extends StatelessWidget {
           items.add(_DetailItem.event(filteredEvents[i], groupIndices[i]));
         }
 
+        final isCompactHero = heroEvents.length > 1;
+
         return Column(
           children: [
-            if (heroEvent != null) HeroCard(event: heroEvent!, now: now),
+            for (final hero in heroEvents)
+              HeroCard(event: hero, now: now, compact: isCompactHero),
             Expanded(
               child: ListView.builder(
                 itemCount: items.length,

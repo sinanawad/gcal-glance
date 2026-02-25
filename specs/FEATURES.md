@@ -42,6 +42,7 @@ This document describes every feature and behavior of the app as of the current 
 ### Filtering
 - Only events with both `start.dateTime` and `end.dateTime` set are shown (all-day events are excluded since they use `start.date` instead)
 - Events with `status == 'cancelled'` are excluded
+- Events where the user's response status is `declined` are excluded (determined via `attendees[].self == true`)
 - Events are ordered by start time (API-side `orderBy: 'startTime'`, `singleEvents: true` to expand recurring events)
 
 ### Polling

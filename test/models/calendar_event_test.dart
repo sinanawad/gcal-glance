@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gcal_glance/models/calendar_event.dart';
+import 'package:googleapis/calendar/v3.dart' as calendar;
 
 void main() {
   group('status', () {
@@ -202,6 +203,141 @@ void main() {
       final during = DateTime(2026, 2, 24, 10, 0, 5);
       expect(event.status(during), EventStatus.ongoing);
       expect(event.progress(during), closeTo(0.5, 0.01));
+    });
+  });
+
+  group('ResponseStatus', () {
+    test('defaults to accepted when no responseStatus provided', () {
+      final event = CalendarEvent(
+        summary: 'Meeting',
+        startTime: DateTime(2026, 2, 25, 10, 0),
+        endTime: DateTime(2026, 2, 25, 11, 0),
+      );
+
+      expect(event.responseStatus, ResponseStatus.accepted);
+      expect(event.isAccepted, true);
+      expect(event.isTentative, false);
+    });
+
+    test('isTentative is true for tentative responseStatus', () {
+      final event = CalendarEvent(
+        summary: 'Maybe',
+        startTime: DateTime(2026, 2, 25, 10, 0),
+        endTime: DateTime(2026, 2, 25, 11, 0),
+        responseStatus: ResponseStatus.tentative,
+      );
+
+      expect(event.isTentative, true);
+      expect(event.isAccepted, false);
+    });
+
+    test('isTentative is true for needsAction responseStatus', () {
+      final event = CalendarEvent(
+        summary: 'No response yet',
+        startTime: DateTime(2026, 2, 25, 10, 0),
+        endTime: DateTime(2026, 2, 25, 11, 0),
+        responseStatus: ResponseStatus.needsAction,
+      );
+
+      expect(event.isTentative, true);
+      expect(event.isAccepted, false);
+    });
+
+    test('declined event has correct flags', () {
+      final event = CalendarEvent(
+        summary: 'Nope',
+        startTime: DateTime(2026, 2, 25, 10, 0),
+        endTime: DateTime(2026, 2, 25, 11, 0),
+        responseStatus: ResponseStatus.declined,
+      );
+
+      expect(event.isTentative, false);
+      expect(event.isAccepted, false);
+      expect(event.responseStatus, ResponseStatus.declined);
+    });
+  });
+
+  group('fromGoogleEvent RSVP mapping', () {
+    calendar.Event makeGoogleEvent({
+      String? selfResponseStatus,
+      bool hasSelfAttendee = true,
+      bool hasAttendees = true,
+    }) {
+      final event = calendar.Event()
+        ..summary = 'Test Meeting'
+        ..start = (calendar.EventDateTime()
+          ..dateTime = DateTime.utc(2026, 2, 25, 15, 0))
+        ..end = (calendar.EventDateTime()
+          ..dateTime = DateTime.utc(2026, 2, 25, 16, 0))
+        ..hangoutLink = 'https://meet.google.com/abc-def-ghi';
+
+      if (hasAttendees) {
+        final others = calendar.EventAttendee()
+          ..email = 'other@example.com'
+          ..responseStatus = 'accepted'
+          ..self = false;
+
+        if (hasSelfAttendee) {
+          final self = calendar.EventAttendee()
+            ..email = 'me@example.com'
+            ..responseStatus = selfResponseStatus
+            ..self = true;
+          event.attendees = [others, self];
+        } else {
+          event.attendees = [others];
+        }
+      }
+
+      return event;
+    }
+
+    test('maps accepted responseStatus', () {
+      final event = CalendarEvent.fromGoogleEvent(
+        makeGoogleEvent(selfResponseStatus: 'accepted'),
+      );
+      expect(event.responseStatus, ResponseStatus.accepted);
+    });
+
+    test('maps tentative responseStatus', () {
+      final event = CalendarEvent.fromGoogleEvent(
+        makeGoogleEvent(selfResponseStatus: 'tentative'),
+      );
+      expect(event.responseStatus, ResponseStatus.tentative);
+    });
+
+    test('maps needsAction responseStatus', () {
+      final event = CalendarEvent.fromGoogleEvent(
+        makeGoogleEvent(selfResponseStatus: 'needsAction'),
+      );
+      expect(event.responseStatus, ResponseStatus.needsAction);
+    });
+
+    test('maps declined responseStatus', () {
+      final event = CalendarEvent.fromGoogleEvent(
+        makeGoogleEvent(selfResponseStatus: 'declined'),
+      );
+      expect(event.responseStatus, ResponseStatus.declined);
+    });
+
+    test('defaults to accepted when no self attendee found', () {
+      final event = CalendarEvent.fromGoogleEvent(
+        makeGoogleEvent(hasSelfAttendee: false),
+      );
+      expect(event.responseStatus, ResponseStatus.accepted);
+    });
+
+    test('defaults to accepted when no attendees list (personal event)', () {
+      final event = CalendarEvent.fromGoogleEvent(
+        makeGoogleEvent(hasAttendees: false),
+      );
+      expect(event.responseStatus, ResponseStatus.accepted);
+    });
+
+    test('preserves meeting link from hangoutLink', () {
+      final event = CalendarEvent.fromGoogleEvent(
+        makeGoogleEvent(selfResponseStatus: 'accepted'),
+      );
+      expect(event.meetingLink, 'https://meet.google.com/abc-def-ghi');
     });
   });
 }

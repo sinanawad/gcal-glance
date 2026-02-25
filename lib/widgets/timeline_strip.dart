@@ -139,6 +139,9 @@ class _TimelinePainter extends CustomPainter {
     }
 
     // Second pass: draw each event block.
+    // Track accepted-only index for solid/stripe alternation so tentative
+    // events mixed in don't flip parity unexpectedly.
+    int acceptedIndex = 0;
     for (var i = 0; i < sorted.length; i++) {
       final event = sorted[i];
       final x1 = _timeToX(event.startTime, size);
@@ -156,14 +159,33 @@ class _TimelinePainter extends CustomPainter {
           statusColor = CrtTheme.normal;
       }
 
-      // Alternating fill: even events are solid, odd events use horizontal lines.
+      // Fill pattern: tentative=crosshatch, accepted=alternating solid/stripe.
       final blockRect = Rect.fromLTWH(x1, 18, blockWidth, 52);
       final rrect = RRect.fromRectAndRadius(blockRect, const Radius.circular(4));
 
-      if (i.isEven) {
+      if (event.isTentative) {
+        // Tentative: crosshatch (diagonal grid) pattern
+        final fillPaint = Paint()..color = statusColor.withValues(alpha: 0.15);
+        canvas.drawRRect(rrect, fillPaint);
+
+        canvas.save();
+        canvas.clipRRect(rrect);
+        final gridPaint = Paint()
+          ..color = statusColor.withValues(alpha: 0.35)
+          ..strokeWidth = 1.0;
+        const spacing = 6.0;
+        for (double d = -52; d < blockWidth + 52; d += spacing) {
+          canvas.drawLine(
+              Offset(x1 + d, 70), Offset(x1 + d + 52, 18), gridPaint);
+          canvas.drawLine(
+              Offset(x1 + d, 18), Offset(x1 + d + 52, 70), gridPaint);
+        }
+        canvas.restore();
+      } else if (acceptedIndex.isEven) {
         // Solid fill
         final fillPaint = Paint()..color = statusColor.withValues(alpha: 0.55);
         canvas.drawRRect(rrect, fillPaint);
+        acceptedIndex++;
       } else {
         // Horizontal stripe fill
         final fillPaint = Paint()..color = statusColor.withValues(alpha: 0.25);
@@ -178,6 +200,7 @@ class _TimelinePainter extends CustomPainter {
           canvas.drawLine(Offset(x1, y), Offset(x1 + blockWidth, y), stripePaint);
         }
         canvas.restore();
+        acceptedIndex++;
       }
 
       // Border outline

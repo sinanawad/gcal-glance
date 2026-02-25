@@ -84,13 +84,15 @@ class CompactEventRow extends StatelessWidget {
         final double timeFontSize = hasMeetingLink ? 24 : 18;
         final double countdownFontSize = hasMeetingLink ? 22 : 18;
         final Color titleColor = hasMeetingLink
-            ? CrtTheme.textPrimary
+            ? (event.isTentative
+                ? CrtTheme.textPrimary.withValues(alpha: 0.7)
+                : CrtTheme.textPrimary)
             : CrtTheme.textSecondary;
         final Color timeColor = hasMeetingLink
             ? CrtTheme.textSecondary
             : CrtTheme.textSecondary.withValues(alpha: 0.6);
 
-        return Container(
+        final rowContent = Container(
           decoration: BoxDecoration(
             color: bgColor,
             border: Border(
@@ -172,7 +174,47 @@ class CompactEventRow extends StatelessWidget {
             ],
           ),
         );
+
+        if (event.isTentative) {
+          return ClipRect(
+            child: CustomPaint(
+              foregroundPainter: _CrosshatchPainter(color: statusColor),
+              child: rowContent,
+            ),
+          );
+        }
+        return rowContent;
       },
     );
   }
+}
+
+class _CrosshatchPainter extends CustomPainter {
+  final Color color;
+  _CrosshatchPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.12)
+      ..strokeWidth = 1.0;
+
+    const spacing = 10.0;
+
+    for (double d = -size.height; d < size.width + size.height; d += spacing) {
+      canvas.drawLine(
+        Offset(d, size.height),
+        Offset(d + size.height, 0),
+        paint,
+      );
+      canvas.drawLine(
+        Offset(d, 0),
+        Offset(d + size.height, size.height),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CrosshatchPainter old) => color != old.color;
 }

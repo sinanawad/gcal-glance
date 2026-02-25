@@ -167,6 +167,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
                 e.status != 'cancelled',
           )
           .map((e) => CalendarEvent.fromGoogleEvent(e))
+          .where((e) => e.responseStatus != ResponseStatus.declined)
           .toList();
 
       if (mounted) {
@@ -208,16 +209,28 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     }
   }
 
-  /// Select the hero event: among ongoing events with a meeting link,
-  /// the one ending soonest.
-  CalendarEvent? _selectHeroEvent(DateTime now) {
-    final ongoingEvents = _events
+  /// Select hero events: ongoing with meeting links.
+  /// Accepted events take priority; all accepted are shown (dual hero).
+  /// Tentative only promoted if no accepted hero exists (single).
+  List<CalendarEvent> _selectHeroEvents(DateTime now) {
+    final ongoingWithLink = _events
         .where((e) =>
             e.status(now) == EventStatus.ongoing && e.meetingLink != null)
         .toList();
-    if (ongoingEvents.isEmpty) return null;
-    ongoingEvents.sort((a, b) => a.endTime.compareTo(b.endTime));
-    return ongoingEvents.first;
+    if (ongoingWithLink.isEmpty) return [];
+
+    final accepted = ongoingWithLink.where((e) => e.isAccepted).toList();
+    final tentative = ongoingWithLink.where((e) => e.isTentative).toList();
+
+    if (accepted.isNotEmpty) {
+      accepted.sort((a, b) => a.endTime.compareTo(b.endTime));
+      return accepted;
+    }
+    if (tentative.isNotEmpty) {
+      tentative.sort((a, b) => a.endTime.compareTo(b.endTime));
+      return [tentative.first];
+    }
+    return [];
   }
 
   /// Find the next future event with a meeting link.
@@ -462,7 +475,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     return ValueListenableBuilder<DateTime>(
       valueListenable: _now,
       builder: (context, now, _) {
-        final heroEvent = _selectHeroEvent(now);
+        final heroEvents = _selectHeroEvents(now);
         final todayEvents = _todayEvents(now);
         final detailEvents = _detailEvents(now);
 
@@ -489,7 +502,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
                   Expanded(
                     child: DetailArea(
                       events: detailEvents,
-                      heroEvent: heroEvent,
+                      heroEvents: heroEvents,
                       now: _now,
                     ),
                   ),

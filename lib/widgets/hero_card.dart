@@ -8,8 +8,14 @@ import 'package:gcal_glance/models/calendar_event.dart';
 class HeroCard extends StatelessWidget {
   final CalendarEvent event;
   final ValueNotifier<DateTime> now;
+  final bool compact;
 
-  const HeroCard({super.key, required this.event, required this.now});
+  const HeroCard({
+    super.key,
+    required this.event,
+    required this.now,
+    this.compact = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -24,39 +30,68 @@ class HeroCard extends StatelessWidget {
         final hasValidLink = event.meetingLink != null &&
             Uri.tryParse(event.meetingLink!)?.scheme == 'https';
 
+        final borderColor = event.isTentative
+            ? CrtTheme.upcoming.withValues(alpha: 0.7)
+            : CrtTheme.ongoing;
+        final accentColor = event.isTentative ? CrtTheme.upcoming : CrtTheme.ongoing;
+
+        final double titleSize = compact ? 24 : 38;
+        final int titleMaxLines = compact ? 1 : 2;
+        final double timeSize = compact ? 16 : 19;
+        final double progressHeight = compact ? 8 : 12;
+        final EdgeInsets padding = compact
+            ? const EdgeInsets.symmetric(horizontal: 10, vertical: 8)
+            : const EdgeInsets.all(16);
+        final EdgeInsets margin = compact
+            ? const EdgeInsets.symmetric(horizontal: 12, vertical: 4)
+            : const EdgeInsets.symmetric(horizontal: 12, vertical: 8);
+        final double borderWidth = compact ? 1.5 : 2;
+
         return Card(
           color: CrtTheme.background,
           shape: RoundedRectangleBorder(
-            side: const BorderSide(color: CrtTheme.ongoing, width: 2),
+            side: BorderSide(color: borderColor, width: borderWidth),
             borderRadius: BorderRadius.circular(12),
           ),
-          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          margin: margin,
           elevation: 8,
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: padding,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (event.isTentative) ...[
+                      Text(
+                        'TENTATIVE',
+                        style: GoogleFonts.vt323(
+                          fontSize: 12,
+                          color: CrtTheme.upcoming,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                    ],
                     Expanded(
                       child: Text(
                         event.summary,
                         style: GoogleFonts.vt323(
-                          fontSize: 38,
+                          fontSize: titleSize,
                           color: CrtTheme.textPrimary,
                         ),
-                        maxLines: 2,
+                        maxLines: titleMaxLines,
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Text(
-                      '$startHour:$startMin\n$endHour:$endMin',
+                      compact
+                          ? '$startHour:$startMin\u2192$endHour:$endMin'
+                          : '$startHour:$startMin\n$endHour:$endMin',
                       textAlign: TextAlign.right,
                       style: GoogleFonts.vt323(
-                        fontSize: 19,
+                        fontSize: timeSize,
                         color: CrtTheme.textSecondary,
                       ),
                     ),
@@ -68,7 +103,10 @@ class HeroCard extends StatelessWidget {
                             : CrtTheme.joinDisabled,
                         disabledBackgroundColor: CrtTheme.joinDisabled,
                         disabledForegroundColor: CrtTheme.textSecondary,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: compact ? 6 : 12,
+                        ),
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         shape: RoundedRectangleBorder(
@@ -81,12 +119,14 @@ class HeroCard extends StatelessWidget {
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Icon(Icons.videocam, size: 18, color: CrtTheme.textPrimary),
+                          Icon(Icons.videocam,
+                              size: compact ? 16 : 18,
+                              color: CrtTheme.textPrimary),
                           const SizedBox(height: 4),
                           Text(
                             'JOIN',
                             style: GoogleFonts.vt323(
-                              fontSize: 14,
+                              fontSize: compact ? 12 : 14,
                               color: CrtTheme.textPrimary,
                             ),
                           ),
@@ -95,7 +135,7 @@ class HeroCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: compact ? 6 : 12),
                 Row(
                   children: [
                     Expanded(
@@ -103,9 +143,9 @@ class HeroCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
                           value: event.progress(currentTime),
-                          minHeight: 12,
+                          minHeight: progressHeight,
                           backgroundColor: CrtTheme.clockFlap,
-                          color: CrtTheme.ongoing,
+                          color: accentColor,
                         ),
                       ),
                     ),
@@ -113,8 +153,8 @@ class HeroCard extends StatelessWidget {
                     Text(
                       '${(event.progress(currentTime) * 100).toInt()}%',
                       style: GoogleFonts.vt323(
-                        fontSize: 16,
-                        color: CrtTheme.ongoing,
+                        fontSize: compact ? 14 : 16,
+                        color: accentColor,
                       ),
                     ),
                   ],
