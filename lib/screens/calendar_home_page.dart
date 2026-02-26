@@ -411,9 +411,13 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
       valueListenable: _now,
       builder: (context, now, _) {
         final next = _nextMeetingWithLink(now);
+
+        final Color borderColor;
+        final Widget content;
+
         if (next == null) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+          borderColor = CrtTheme.textSecondary.withValues(alpha: 0.3);
+          content = Center(
             child: Text(
               'NO MEETINGS',
               textAlign: TextAlign.center,
@@ -423,39 +427,36 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
               ),
             ),
           );
-        }
-
-        final countdown = next.startTime.difference(now);
-        final hours = countdown.inHours;
-        final minutes = countdown.inMinutes.remainder(60);
-
-        final String timeText;
-        if (hours > 0) {
-          timeText = '${hours}h ${minutes}m';
         } else {
-          timeText = '${minutes}m';
-        }
+          final countdown = next.startTime.difference(now);
+          final hours = countdown.inHours;
+          final minutes = countdown.inMinutes.remainder(60);
 
-        final status = next.status(now);
-        final Color accentColor;
-        switch (status) {
-          case EventStatus.ongoing:
-            accentColor = CrtTheme.ongoing;
-          case EventStatus.upcoming:
-            accentColor = CrtTheme.upcoming;
-          case EventStatus.normal:
-            accentColor = CrtTheme.normal;
-        }
+          final String timeText;
+          if (hours > 0) {
+            timeText = '${hours}h ${minutes}m';
+          } else {
+            timeText = '${minutes}m';
+          }
 
-        return Container(
-          margin: const EdgeInsets.symmetric(horizontal: 12),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-          decoration: BoxDecoration(
-            border: Border.all(color: accentColor.withValues(alpha: 0.5)),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+          final status = next.status(now);
+          switch (status) {
+            case EventStatus.ongoing:
+              borderColor = CrtTheme.ongoing.withValues(alpha: 0.5);
+            case EventStatus.upcoming:
+              borderColor = CrtTheme.upcoming.withValues(alpha: 0.5);
+            case EventStatus.normal:
+              borderColor = CrtTheme.normal.withValues(alpha: 0.5);
+          }
+
+          final accentColor = status == EventStatus.ongoing
+              ? CrtTheme.ongoing
+              : status == EventStatus.upcoming
+                  ? CrtTheme.upcoming
+                  : CrtTheme.normal;
+
+          content = Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.videocam, size: 28, color: accentColor),
               const SizedBox(height: 4),
@@ -475,6 +476,37 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
                 style: GoogleFonts.vt323(
                   fontSize: 16,
                   color: CrtTheme.textSecondary,
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12),
+          height: 200,
+          clipBehavior: Clip.hardEdge,
+          decoration: BoxDecoration(
+            border: Border.all(color: borderColor),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'NEXT UP',
+                  style: GoogleFonts.vt323(
+                    fontSize: 16,
+                    color: CrtTheme.textSecondary.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  child: content,
                 ),
               ),
             ],
