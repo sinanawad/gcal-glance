@@ -32,8 +32,11 @@ This document describes every feature and behavior of the app as of the current 
 ## 3. Data Fetching
 
 ### Calendar Source
-- Fetches from the `primary` calendar only (single calendar)
+- Fetches from the user's primary calendar by default, with optional multi-calendar support
 - Uses Google Calendar API v3 (`googleapis` package)
+- `calendarList.list()` fetches all visible calendars; user selects which to display via 'C' key picker
+- Selected calendars are persisted to secure storage (key: `gcal_selected_calendars`)
+- Events are fetched in parallel across all selected calendars via `Future.wait`
 
 ### Time Range
 - Fetches events from **now** to **end of tomorrow** (23:59:59 on the next day)
@@ -42,6 +45,7 @@ This document describes every feature and behavior of the app as of the current 
 ### Filtering
 - Only events with both `start.dateTime` and `end.dateTime` set are shown (all-day events are excluded since they use `start.date` instead)
 - Events with `status == 'cancelled'` are excluded
+- Events where the user's response status is `declined` are excluded (determined via `attendees[].self == true`)
 - Events are ordered by start time (API-side `orderBy: 'startTime'`, `singleEvents: true` to expand recurring events)
 
 ### Polling
@@ -209,7 +213,7 @@ lib/
 
 ## 11. Known Limitations
 
-- **Single calendar only**: fetches from `primary` calendar; no multi-calendar support
+- **Multi-calendar supported**: press 'C' to toggle additional calendars; secondary events shown faded with Google Calendar colors
 - **No offline mode**: if the initial fetch fails, only a loading spinner is shown (no cached events across app restarts)
 - **All-day events excluded**: only timed events (with `dateTime`) are displayed
 - **No event details view**: tapping an event does nothing (no expanded view or description)

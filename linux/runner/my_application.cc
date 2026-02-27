@@ -48,7 +48,7 @@ static void my_application_activate(GApplication* application) {
     gtk_window_set_title(window, "Flutter Google Calendar");
   }
 
-  gtk_window_set_default_size(window, 1400, 450);
+  gtk_window_set_default_size(window, 1436, 462);
   gtk_widget_show(GTK_WIDGET(window));
 
   g_autoptr(FlDartProject) project = fl_dart_project_new();

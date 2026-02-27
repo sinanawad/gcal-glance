@@ -118,10 +118,13 @@ void main() {
     test('deletes credentials from secure storage', () async {
       when(() => mockStorage.delete(key: 'gcal_oauth_token'))
           .thenAnswer((_) async {});
+      when(() => mockStorage.delete(key: 'gcal_selected_calendars'))
+          .thenAnswer((_) async {});
 
       await service.signOut();
 
       verify(() => mockStorage.delete(key: 'gcal_oauth_token')).called(1);
+      verify(() => mockStorage.delete(key: 'gcal_selected_calendars')).called(1);
     });
 
     test('clears cached client so next getAuthenticatedClient reads storage',
@@ -143,6 +146,8 @@ void main() {
             value: any(named: 'value'),
           )).thenAnswer((_) async {});
       when(() => mockStorage.delete(key: 'gcal_oauth_token'))
+          .thenAnswer((_) async {});
+      when(() => mockStorage.delete(key: 'gcal_selected_calendars'))
           .thenAnswer((_) async {});
 
       // Establish a cached client.

@@ -3,10 +3,16 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gcal_glance/config/crt_theme.dart';
 import 'package:gcal_glance/models/calendar_event.dart';
+import 'package:gcal_glance/models/calendar_info.dart';
 import 'package:gcal_glance/services/google_calendar_service.dart';
-import 'package:gcal_glance/widgets/clock_widget.dart';
-import 'package:gcal_glance/widgets/event_list.dart';
+import 'package:gcal_glance/widgets/calendar_picker.dart';
+import 'package:gcal_glance/widgets/clock_column.dart';
+import 'package:gcal_glance/widgets/detail_area.dart';
+import 'package:gcal_glance/widgets/timeline_strip.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:googleapis/calendar/v3.dart' as gcal;
 import 'package:googleapis_auth/googleapis_auth.dart' as auth;
 import 'package:http/http.dart' as http;
 
@@ -21,7 +27,6 @@ class CalendarHomePage extends StatefulWidget {
 
 class _CalendarHomePageState extends State<CalendarHomePage> {
   bool _isLoggedIn = false;
-  bool _isLoading = false;
   bool _hasCompletedFirstLoad = false;
   List<CalendarEvent> _events = [];
   Timer? _dataFetchTimer;
@@ -29,22 +34,104 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
   final ValueNotifier<DateTime> _now = ValueNotifier(DateTime.now());
   Timer? _clockTimer;
 
+  /// Time simulation: offset from real time. Zero means real time.
+  Duration _timeOffset = Duration.zero;
+  bool _showSimControls = false;
+  bool _showCalendarPicker = false;
+  List<CalendarInfo> _allCalendars = [];
+  Set<String> _selectedCalendarIds = {};
+  bool _isMuted = false;
+  final Set<String> _notifiedEventKeys = {};
+  final Map<String, String?> _photoCache = {};
+  late final FocusNode _focusNode;
+
+  DateTime get _simulatedNow => DateTime.now().add(_timeOffset);
+
+  void _adjustTime(Duration delta) {
+    setState(() {
+      _timeOffset += delta;
+      _now.value = _simulatedNow;
+    });
+  }
+
+  void _resetTime() {
+    setState(() {
+      _timeOffset = Duration.zero;
+      _now.value = DateTime.now();
+    });
+  }
+
+  /// Unique key for deduplicating meeting-start notifications.
+  String _eventKey(CalendarEvent e) =>
+      '${e.calendarId}:${e.summary}:${e.startTime.toIso8601String()}';
+
+  void _checkMeetingStarted() {
+    if (_isMuted || _events.isEmpty) return;
+    final now = _simulatedNow;
+    for (final event in _events) {
+      if (!event.isPrimary || event.meetingLink == null) continue;
+      if (event.status(now) != EventStatus.ongoing) continue;
+      final key = _eventKey(event);
+      if (_notifiedEventKeys.contains(key)) continue;
+      _notifiedEventKeys.add(key);
+      _playChirp();
+      break; // one chirp per tick is enough
+    }
+  }
+
+  void _playChirp() {
+    // Fire-and-forget; ignore errors if sound system unavailable.
+    Process.run('paplay', [
+      '/usr/share/sounds/freedesktop/stereo/camera-shutter.oga',
+    ]);
+  }
+
   @override
   void initState() {
     super.initState();
+    _focusNode = FocusNode();
     _checkCurrentUser();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      _now.value = DateTime.now();
+      _now.value = _simulatedNow;
+      _checkMeetingStarted();
     });
   }
 
   @override
   void dispose() {
+    _focusNode.dispose();
     _dataFetchTimer?.cancel();
     _clockTimer?.cancel();
     _now.dispose();
     widget.calendarService.dispose();
     super.dispose();
+  }
+
+  KeyEventResult _handleKeyEvent(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent) {
+      if (event.logicalKey == LogicalKeyboardKey.keyS) {
+        setState(() => _showSimControls = !_showSimControls);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.keyC) {
+        setState(() => _showCalendarPicker = !_showCalendarPicker);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.keyM) {
+        setState(() => _isMuted = !_isMuted);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.escape &&
+          _showCalendarPicker) {
+        setState(() => _showCalendarPicker = false);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.keyO && _isLoggedIn) {
+        _handleSignOut();
+        return KeyEventResult.handled;
+      }
+    }
+    return KeyEventResult.ignored;
   }
 
   void _showErrorSnackBar(
@@ -105,52 +192,162 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     await widget.calendarService.signOut();
     setState(() {
       _isLoggedIn = false;
-      _isLoading = false;
       _hasCompletedFirstLoad = false;
       _events = [];
+      _allCalendars = [];
+      _selectedCalendarIds = {};
+      _showCalendarPicker = false;
+      _photoCache.clear();
       _dataFetchTimer?.cancel();
     });
   }
 
   void _startPolling() {
-    _updateEvents();
+    _loadCalendarList();
     _dataFetchTimer = Timer.periodic(const Duration(seconds: 60), (timer) {
       _updateEvents();
     });
+  }
+
+  Future<void> _loadCalendarList() async {
+    final httpClient = await widget.calendarService.getAuthenticatedClient();
+    if (httpClient == null || !mounted) return;
+
+    try {
+      final entries =
+          await widget.calendarService.fetchCalendarList(httpClient);
+      final calendars = entries
+          .map((e) => CalendarInfo(
+                id: e.id!,
+                summary: e.summaryOverride ?? e.summary ?? 'Untitled',
+                isPrimary: e.primary == true,
+                backgroundColor: e.backgroundColor,
+                foregroundColor: e.foregroundColor,
+              ))
+          .toList();
+
+      final primaryId =
+          calendars.where((c) => c.isPrimary).map((c) => c.id).firstOrNull;
+
+      // Load persisted selection, or default to primary only.
+      // Intersect against current calendar list to discard stale IDs.
+      final validIds = calendars.map((c) => c.id).toSet();
+      final saved = await widget.calendarService.loadSelectedCalendars();
+      final selectedIds = saved != null
+          ? saved.toSet().intersection(validIds)
+          : {?primaryId};
+
+      // Ensure primary is always selected.
+      if (primaryId != null) {
+        selectedIds.add(primaryId);
+      }
+
+      // Persist the cleaned-up selection if stale IDs were removed.
+      if (saved != null && selectedIds.length != saved.length) {
+        widget.calendarService
+            .saveSelectedCalendars(selectedIds.toList());
+      }
+
+      if (mounted) {
+        setState(() {
+          _allCalendars = calendars;
+          _selectedCalendarIds = selectedIds;
+        });
+        _updateEvents();
+      }
+    } catch (_) {
+      // Calendar list fetch failed; fall back to primary-only fetch.
+      _updateEvents();
+    }
+  }
+
+  void _handleCalendarToggle(String calendarId) {
+    setState(() {
+      if (_selectedCalendarIds.contains(calendarId)) {
+        _selectedCalendarIds.remove(calendarId);
+      } else {
+        _selectedCalendarIds.add(calendarId);
+      }
+    });
+    widget.calendarService
+        .saveSelectedCalendars(_selectedCalendarIds.toList());
+    _updateEvents();
   }
 
   Future<void> _updateEvents() async {
     final httpClient = await widget.calendarService.getAuthenticatedClient();
     if (httpClient == null || !mounted) return;
 
-    setState(() {
-      _isLoading = true;
-    });
-
     try {
-      final apiEvents = await widget.calendarService.fetchEvents(httpClient);
+      // Determine which calendars to fetch.
+      final calendarIds = _selectedCalendarIds.isNotEmpty
+          ? _selectedCalendarIds.toList()
+          : ['primary'];
 
-      final newEvents = apiEvents
-          .where(
-            (e) =>
-                e.start?.dateTime != null &&
-                e.end?.dateTime != null &&
-                e.status != 'cancelled',
-          )
-          .map((e) => CalendarEvent.fromGoogleEvent(e))
-          .toList();
+      // Build a lookup of calendar metadata.
+      final calendarMap = {for (final c in _allCalendars) c.id: c};
+
+      // Parallel fetch across all selected calendars.
+      // Individual failures return empty lists so one bad calendar
+      // doesn't break the entire refresh.
+      final results = await Future.wait(
+        calendarIds.map((id) => widget.calendarService
+            .fetchEvents(httpClient, calendarId: id)
+            .catchError((_) => <gcal.Event>[])),
+      );
+
+      final newEvents = <CalendarEvent>[];
+      for (var i = 0; i < calendarIds.length; i++) {
+        final calId = calendarIds[i];
+        final cal = calendarMap[calId];
+        final isPrimary = cal?.isPrimary ?? (calId == 'primary');
+        final colorValue = CalendarEvent.parseHexColor(cal?.backgroundColor);
+
+        for (final e in results[i]) {
+          if (e.start?.dateTime == null ||
+              e.end?.dateTime == null ||
+              e.status == 'cancelled') {
+            continue;
+          }
+          final event = CalendarEvent.fromGoogleEvent(
+            e,
+            calendarId: calId,
+            isPrimary: isPrimary,
+            calendarColorValue: colorValue,
+          );
+          if (event.responseStatus != ResponseStatus.declined) {
+            newEvents.add(event);
+          }
+        }
+      }
+
+      newEvents.sort((a, b) => a.startTime.compareTo(b.startTime));
 
       if (mounted) {
+        // On first load, pre-seed notified set with already-ongoing
+        // meetings so we don't chirp for meetings that started before
+        // the app launched.
+        if (!_hasCompletedFirstLoad) {
+          final now = _simulatedNow;
+          for (final event in newEvents) {
+            if (event.isPrimary &&
+                event.meetingLink != null &&
+                event.status(now) == EventStatus.ongoing) {
+              _notifiedEventKeys.add(_eventKey(event));
+            }
+          }
+        }
         setState(() {
           _events = newEvents;
-          _isLoading = false;
           _hasCompletedFirstLoad = true;
         });
+
+        // Async-fetch contact photos for 1-on-1 meetings.
+        _fetchContactPhotos(httpClient, newEvents);
       }
     } on auth.AccessDeniedException {
       if (mounted) {
         setState(() {
-          _isLoading = false;
           _hasCompletedFirstLoad = true;
         });
         _showErrorSnackBar('Session expired. Please sign in again.');
@@ -159,7 +356,6 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     } on SocketException {
       if (mounted) {
         setState(() {
-          _isLoading = false;
           _hasCompletedFirstLoad = true;
         });
         _showErrorSnackBar(
@@ -171,7 +367,6 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     } on http.ClientException {
       if (mounted) {
         setState(() {
-          _isLoading = false;
           _hasCompletedFirstLoad = true;
         });
         _showErrorSnackBar(
@@ -183,29 +378,238 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     }
   }
 
+  /// Fetches contact photos for 1-on-1 meeting attendees not yet cached.
+  Future<void> _fetchContactPhotos(
+    http.Client client,
+    List<CalendarEvent> events,
+  ) async {
+    // Collect unique emails from primary 1-on-1 meetings not yet in cache.
+    final emailsToFetch = <String>{};
+    for (final event in events) {
+      final email = event.otherAttendeeEmail;
+      if (email != null && event.isPrimary && !_photoCache.containsKey(email)) {
+        emailsToFetch.add(email);
+      }
+    }
+
+    // Fetch new photos in parallel.
+    if (emailsToFetch.isNotEmpty) {
+      final futures = emailsToFetch.map((email) async {
+        final url =
+            await widget.calendarService.fetchContactPhoto(client, email);
+        _photoCache[email] = url;
+      });
+      await Future.wait(futures);
+    }
+
+    if (!mounted) return;
+
+    // Always apply cached photo URLs to current events.
+    setState(() {
+      _events = _events.map((event) {
+        final email = event.otherAttendeeEmail;
+        if (email != null && _photoCache.containsKey(email)) {
+          return event.copyWithPhotoUrl(_photoCache[email]);
+        }
+        return event;
+      }).toList();
+    });
+  }
+
+  /// Select hero events: ongoing primary events with meeting links.
+  /// Accepted events take priority; all accepted are shown (dual hero).
+  /// Tentative only promoted if no accepted hero exists (single).
+  List<CalendarEvent> _selectHeroEvents(DateTime now) {
+    final ongoingWithLink = _events
+        .where((e) =>
+            e.isPrimary &&
+            e.status(now) == EventStatus.ongoing &&
+            e.meetingLink != null)
+        .toList();
+    if (ongoingWithLink.isEmpty) return [];
+
+    final accepted = ongoingWithLink.where((e) => e.isAccepted).toList();
+    final tentative = ongoingWithLink.where((e) => e.isTentative).toList();
+
+    if (accepted.isNotEmpty) {
+      accepted.sort((a, b) => a.endTime.compareTo(b.endTime));
+      return accepted;
+    }
+    if (tentative.isNotEmpty) {
+      tentative.sort((a, b) => a.endTime.compareTo(b.endTime));
+      return [tentative.first];
+    }
+    return [];
+  }
+
+  /// Find the next future primary event with a meeting link.
+  CalendarEvent? _nextMeetingWithLink(DateTime now) {
+    final future = _events
+        .where(
+            (e) => e.isPrimary && e.startTime.isAfter(now) && e.meetingLink != null)
+        .toList();
+    if (future.isEmpty) return null;
+    future.sort((a, b) => a.startTime.compareTo(b.startTime));
+    return future.first;
+  }
+
+  Widget _buildMeetingCountdown() {
+    return ValueListenableBuilder<DateTime>(
+      valueListenable: _now,
+      builder: (context, now, _) {
+        final next = _nextMeetingWithLink(now);
+
+        final Color borderColor;
+        final Widget content;
+
+        if (next == null) {
+          borderColor = CrtTheme.textSecondary.withValues(alpha: 0.3);
+          content = Center(
+            child: Text(
+              'NO MEETINGS',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.vt323(
+                fontSize: 18,
+                color: CrtTheme.textSecondary.withValues(alpha: 0.5),
+              ),
+            ),
+          );
+        } else {
+          final countdown = next.startTime.difference(now);
+          final hours = countdown.inHours;
+          final minutes = countdown.inMinutes.remainder(60);
+
+          final String timeText;
+          if (hours > 0) {
+            timeText = '${hours}h ${minutes}m';
+          } else {
+            timeText = '${minutes}m';
+          }
+
+          final status = next.status(now);
+          switch (status) {
+            case EventStatus.ongoing:
+              borderColor = CrtTheme.ongoing.withValues(alpha: 0.5);
+            case EventStatus.upcoming:
+              borderColor = CrtTheme.upcoming.withValues(alpha: 0.5);
+            case EventStatus.past:
+              borderColor = CrtTheme.past.withValues(alpha: 0.5);
+            case EventStatus.normal:
+              borderColor = CrtTheme.normal.withValues(alpha: 0.5);
+          }
+
+          final accentColor = status == EventStatus.ongoing
+              ? CrtTheme.ongoing
+              : status == EventStatus.upcoming
+                  ? CrtTheme.upcoming
+                  : CrtTheme.normal;
+
+          content = Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                timeText,
+                style: GoogleFonts.vt323(
+                  fontSize: 36,
+                  color: accentColor,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                next.summary,
+                textAlign: TextAlign.center,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: GoogleFonts.vt323(
+                  fontSize: 16,
+                  color: CrtTheme.textSecondary,
+                ),
+              ),
+            ],
+          );
+        }
+
+        return Container(
+          margin: const EdgeInsets.symmetric(horizontal: 12),
+          height: 160,
+          clipBehavior: Clip.hardEdge,
+          decoration: BoxDecoration(
+            border: Border.all(color: borderColor),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  'NEXT UP',
+                  style: GoogleFonts.vt323(
+                    fontSize: 16,
+                    color: CrtTheme.textSecondary.withValues(alpha: 0.6),
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  child: content,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Filter events for today's timeline.
+  List<CalendarEvent> _todayEvents(DateTime now) {
+    return _events
+        .where((e) =>
+            e.startTime.year == now.year &&
+            e.startTime.month == now.month &&
+            e.startTime.day == now.day)
+        .toList();
+  }
+
+  /// Filter events for detail area: ongoing + future only (no past).
+  List<CalendarEvent> _detailEvents(DateTime now) {
+    return _events
+        .where((e) =>
+            e.status(now) == EventStatus.ongoing ||
+            e.startTime.isAfter(now))
+        .toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Center(child: ClockWidget(nowNotifier: _now)),
-        actions: [
-          if (_isLoggedIn)
-            IconButton(
-              icon: const Icon(Icons.exit_to_app),
-              onPressed: () {
-                if (Theme.of(context).platform == TargetPlatform.linux) {
-                  SystemNavigator.pop();
-                } else {
-                  Navigator.of(context).pop();
-                }
-              },
-              tooltip: 'Exit',
+    return Focus(
+      focusNode: _focusNode,
+      autofocus: true,
+      onKeyEvent: _handleKeyEvent,
+      child: Scaffold(
+        body: Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: const Color(0xFF5a5a9e),
+                  width: 2,
+                ),
+              ),
+              child: _isLoggedIn ? _buildMainLayout() : _buildLoginScreen(),
             ),
-        ],
-      ),
-      body: Container(
-        color: Colors.grey[700],
-        child: _isLoggedIn ? _buildEventList() : _buildLoginScreen(),
+            if (_showCalendarPicker && _allCalendars.isNotEmpty)
+              CalendarPicker(
+                calendars: _allCalendars,
+                selectedIds: _selectedCalendarIds,
+                onToggle: _handleCalendarToggle,
+                onClose: () =>
+                    setState(() => _showCalendarPicker = false),
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -214,36 +618,167 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     return Center(
       child: ElevatedButton(
         onPressed: _handleSignIn,
-        child: const Text('Sign in with Google'),
+        child: Text(
+          'Sign in with Google',
+          style: GoogleFonts.vt323(fontSize: 20),
+        ),
       ),
     );
   }
 
-  Widget _buildEventList() {
-    if (_events.isEmpty && !_hasCompletedFirstLoad) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (_events.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildTimeControls() {
+    final isSimulating = _timeOffset != Duration.zero;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (isSimulating)
+          Text(
+            'SIM',
+            style: GoogleFonts.vt323(
+              fontSize: 16,
+              color: CrtTheme.upcoming,
+            ),
+          ),
+        const SizedBox(height: 4),
+        // +/- hours
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text(
-              'No upcoming events',
-              style: TextStyle(color: Colors.white, fontSize: 18),
-            ),
-            const SizedBox(height: 16),
-            IconButton(
-              icon: const Icon(Icons.refresh, color: Colors.white, size: 32),
-              onPressed: _isLoading ? null : _updateEvents,
-              tooltip: 'Refresh',
-            ),
+            _timeButton('-1h', () => _adjustTime(const Duration(hours: -1))),
+            const SizedBox(width: 4),
+            _timeButton('+1h', () => _adjustTime(const Duration(hours: 1))),
           ],
         ),
+        const SizedBox(height: 2),
+        // +/- 10 minutes
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            _timeButton('-10m', () => _adjustTime(const Duration(minutes: -10))),
+            const SizedBox(width: 4),
+            _timeButton('+10m', () => _adjustTime(const Duration(minutes: 10))),
+          ],
+        ),
+        const SizedBox(height: 4),
+        if (isSimulating)
+          GestureDetector(
+            onTap: _resetTime,
+            child: Text(
+              'RESET',
+              style: GoogleFonts.vt323(
+                fontSize: 14,
+                color: CrtTheme.joinActive,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _timeButton(String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          border: Border.all(color: CrtTheme.textSecondary.withValues(alpha: 0.4)),
+          borderRadius: BorderRadius.circular(4),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.vt323(
+            fontSize: 14,
+            color: CrtTheme.textSecondary,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMainLayout() {
+    if (_events.isEmpty && !_hasCompletedFirstLoad) {
+      return Row(
+        children: [
+          ClockColumn(
+              now: _now,
+              isMuted: _isMuted,
+              onToggleMute: () => setState(() => _isMuted = !_isMuted),
+            ),
+          const Expanded(
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        ],
       );
     }
 
-    return EventList(events: _events, nowNotifier: _now);
+    if (_events.isEmpty && _hasCompletedFirstLoad) {
+      return Row(
+        children: [
+          ClockColumn(
+              now: _now,
+              isMuted: _isMuted,
+              onToggleMute: () => setState(() => _isMuted = !_isMuted),
+            ),
+          Expanded(
+            child: Center(
+              child: Text(
+                'No upcoming events',
+                style: GoogleFonts.vt323(
+                  color: CrtTheme.textSecondary,
+                  fontSize: 24,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ValueListenableBuilder<DateTime>(
+      valueListenable: _now,
+      builder: (context, now, _) {
+        final heroEvents = _selectHeroEvents(now);
+        final todayEvents = _todayEvents(now);
+        final detailEvents = _detailEvents(now);
+
+        return Row(
+          children: [
+            // Left: Clock column (180px)
+            ClockColumn(
+              now: _now,
+              bottomContent: _buildMeetingCountdown(),
+              isMuted: _isMuted,
+              onToggleMute: () => setState(() => _isMuted = !_isMuted),
+            ),
+            // Right: Timeline strip + detail area
+            Expanded(
+              child: Column(
+                children: [
+                  // Top spacer to align with clock column padding
+                  Container(height: 12, color: CrtTheme.background),
+                  // Timeline strip + time sim controls (press S to toggle)
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TimelineStrip(events: todayEvents, now: _now),
+                      ),
+                      if (_showSimControls) _buildTimeControls(),
+                    ],
+                  ),
+                  // Detail area (Expanded, scrollable)
+                  Expanded(
+                    child: DetailArea(
+                      events: detailEvents,
+                      heroEvents: heroEvents,
+                      now: _now,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 }
