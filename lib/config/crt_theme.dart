@@ -16,6 +16,7 @@ class CrtTheme {
   static const Color ongoing = Color(0xFF4fc3f7);
   static const Color upcoming = Color(0xFFffb74d);
   static const Color normal = Color(0xFF66bb6a);
+  static const Color past = Color(0xFF616161);
 
   // Text colors
   static const Color textPrimary = Color(0xFFe0e0e0);
@@ -44,6 +45,8 @@ class CrtTheme {
         return ongoing;
       case 'upcoming':
         return upcoming;
+      case 'past':
+        return past;
       default:
         return normal;
     }

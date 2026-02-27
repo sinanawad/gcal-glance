@@ -42,6 +42,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
   Set<String> _selectedCalendarIds = {};
   bool _isMuted = false;
   final Set<String> _notifiedEventKeys = {};
+  final Map<String, String?> _photoCache = {};
   late final FocusNode _focusNode;
 
   DateTime get _simulatedNow => DateTime.now().add(_timeOffset);
@@ -125,6 +126,10 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
         setState(() => _showCalendarPicker = false);
         return KeyEventResult.handled;
       }
+      if (event.logicalKey == LogicalKeyboardKey.keyO && _isLoggedIn) {
+        _handleSignOut();
+        return KeyEventResult.handled;
+      }
     }
     return KeyEventResult.ignored;
   }
@@ -192,6 +197,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
       _allCalendars = [];
       _selectedCalendarIds = {};
       _showCalendarPicker = false;
+      _photoCache.clear();
       _dataFetchTimer?.cancel();
     });
   }
@@ -335,6 +341,9 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
           _events = newEvents;
           _hasCompletedFirstLoad = true;
         });
+
+        // Async-fetch contact photos for 1-on-1 meetings.
+        _fetchContactPhotos(httpClient, newEvents);
       }
     } on auth.AccessDeniedException {
       if (mounted) {
@@ -367,6 +376,44 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
         );
       }
     }
+  }
+
+  /// Fetches contact photos for 1-on-1 meeting attendees not yet cached.
+  Future<void> _fetchContactPhotos(
+    http.Client client,
+    List<CalendarEvent> events,
+  ) async {
+    // Collect unique emails from primary 1-on-1 meetings not yet in cache.
+    final emailsToFetch = <String>{};
+    for (final event in events) {
+      final email = event.otherAttendeeEmail;
+      if (email != null && event.isPrimary && !_photoCache.containsKey(email)) {
+        emailsToFetch.add(email);
+      }
+    }
+
+    // Fetch new photos in parallel.
+    if (emailsToFetch.isNotEmpty) {
+      final futures = emailsToFetch.map((email) async {
+        final url =
+            await widget.calendarService.fetchContactPhoto(client, email);
+        _photoCache[email] = url;
+      });
+      await Future.wait(futures);
+    }
+
+    if (!mounted) return;
+
+    // Always apply cached photo URLs to current events.
+    setState(() {
+      _events = _events.map((event) {
+        final email = event.otherAttendeeEmail;
+        if (email != null && _photoCache.containsKey(email)) {
+          return event.copyWithPhotoUrl(_photoCache[email]);
+        }
+        return event;
+      }).toList();
+    });
   }
 
   /// Select hero events: ongoing primary events with meeting links.
@@ -445,6 +492,8 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
               borderColor = CrtTheme.ongoing.withValues(alpha: 0.5);
             case EventStatus.upcoming:
               borderColor = CrtTheme.upcoming.withValues(alpha: 0.5);
+            case EventStatus.past:
+              borderColor = CrtTheme.past.withValues(alpha: 0.5);
             case EventStatus.normal:
               borderColor = CrtTheme.normal.withValues(alpha: 0.5);
           }
@@ -458,8 +507,6 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
           content = Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.videocam, size: 28, color: accentColor),
-              const SizedBox(height: 4),
               Text(
                 timeText,
                 style: GoogleFonts.vt323(
@@ -484,7 +531,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
 
         return Container(
           margin: const EdgeInsets.symmetric(horizontal: 12),
-          height: 200,
+          height: 160,
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
             border: Border.all(color: borderColor),

@@ -48,7 +48,7 @@ void main() {
       expect(event.status(now), EventStatus.normal);
     });
 
-    test('returns normal when now is after end', () {
+    test('returns past when now is after end', () {
       final event = CalendarEvent(
         summary: 'Meeting',
         startTime: DateTime(2026, 2, 24, 10, 0),
@@ -56,7 +56,7 @@ void main() {
       );
       final now = DateTime(2026, 2, 24, 12, 0);
 
-      expect(event.status(now), EventStatus.normal);
+      expect(event.status(now), EventStatus.past);
     });
 
     test('returns normal at exact start time (boundary)', () {

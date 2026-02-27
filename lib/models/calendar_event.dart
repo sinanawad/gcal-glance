@@ -1,6 +1,6 @@
 import 'package:googleapis/calendar/v3.dart' as calendar;
 
-enum EventStatus { ongoing, upcoming, normal }
+enum EventStatus { ongoing, upcoming, normal, past }
 
 enum ResponseStatus { accepted, tentative, needsAction, declined }
 
@@ -13,6 +13,8 @@ class CalendarEvent {
   final String calendarId;
   final bool isPrimary;
   final int? calendarColorValue; // ARGB int from Google hex color
+  final String? otherAttendeeEmail; // For 1-on-1 meetings: other person's email
+  final String? otherAttendeePhotoUrl; // Populated after People API fetch
 
   const CalendarEvent({
     required this.summary,
@@ -23,7 +25,23 @@ class CalendarEvent {
     this.calendarId = 'primary',
     this.isPrimary = true,
     this.calendarColorValue,
+    this.otherAttendeeEmail,
+    this.otherAttendeePhotoUrl,
   });
+
+  /// Returns a copy with the photo URL set (used after async People API fetch).
+  CalendarEvent copyWithPhotoUrl(String? photoUrl) => CalendarEvent(
+        summary: summary,
+        startTime: startTime,
+        endTime: endTime,
+        meetingLink: meetingLink,
+        responseStatus: responseStatus,
+        calendarId: calendarId,
+        isPrimary: isPrimary,
+        calendarColorValue: calendarColorValue,
+        otherAttendeeEmail: otherAttendeeEmail,
+        otherAttendeePhotoUrl: photoUrl,
+      );
 
   /// Whether the user's response is tentative or needsAction.
   bool get isTentative =>
@@ -68,6 +86,20 @@ class CalendarEvent {
         responseStatus = ResponseStatus.accepted;
     }
 
+    // Detect 1-on-1 meetings: exactly 2 non-resource attendees.
+    String? otherEmail;
+    final attendees = event.attendees
+        ?.cast<calendar.EventAttendee?>()
+        .where((a) => a != null && a.resource != true)
+        .cast<calendar.EventAttendee>()
+        .toList();
+    if (attendees != null && attendees.length == 2) {
+      final otherIdx = attendees.indexWhere((a) => a.self != true);
+      if (otherIdx >= 0) {
+        otherEmail = attendees[otherIdx].email;
+      }
+    }
+
     return CalendarEvent(
       summary: event.summary ?? 'No Title',
       startTime: event.start!.dateTime!.toLocal(),
@@ -77,10 +109,14 @@ class CalendarEvent {
       calendarId: calendarId,
       isPrimary: isPrimary,
       calendarColorValue: calendarColorValue,
+      otherAttendeeEmail: otherEmail,
     );
   }
 
   EventStatus status(DateTime now) {
+    if (now.isAfter(endTime)) {
+      return EventStatus.past;
+    }
     if (now.isAfter(startTime) && now.isBefore(endTime)) {
       return EventStatus.ongoing;
     }

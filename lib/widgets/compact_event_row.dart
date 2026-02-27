@@ -54,6 +54,10 @@ class CompactEventRow extends StatelessWidget {
               statusColor = CrtTheme.upcoming;
               bgColor = CrtTheme.upcoming.withValues(alpha: 0.12);
               statusIcon = Icons.notifications_active;
+            case EventStatus.past:
+              statusColor = CrtTheme.past;
+              bgColor = CrtTheme.past.withValues(alpha: 0.08);
+              statusIcon = Icons.event;
             case EventStatus.normal:
               statusColor = CrtTheme.normal;
               bgColor = isEvenGroup
@@ -138,6 +142,31 @@ class CompactEventRow extends StatelessWidget {
                     : statusColor.withValues(alpha: 0.6),
               ),
               const SizedBox(width: 10),
+              // Contact photo for 1-on-1 meetings
+              if (event.otherAttendeeEmail != null && !event.isSecondary)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: event.otherAttendeePhotoUrl != null
+                      ? CircleAvatar(
+                          radius: 14,
+                          backgroundImage:
+                              NetworkImage(event.otherAttendeePhotoUrl!),
+                          backgroundColor: CrtTheme.clockFlap,
+                        )
+                      : CircleAvatar(
+                          radius: 14,
+                          backgroundColor: CrtTheme.clockFlap,
+                          child: Text(
+                            event.otherAttendeeEmail!
+                                .substring(0, 1)
+                                .toUpperCase(),
+                            style: GoogleFonts.vt323(
+                              fontSize: 16,
+                              color: CrtTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                ),
               // Event title
               Expanded(
                 child: Text(

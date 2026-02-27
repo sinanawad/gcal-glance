@@ -226,6 +226,8 @@ class _TimelinePainter extends CustomPainter {
             statusColor = CrtTheme.ongoing;
           case EventStatus.upcoming:
             statusColor = CrtTheme.upcoming;
+          case EventStatus.past:
+            statusColor = CrtTheme.past;
           case EventStatus.normal:
             statusColor = CrtTheme.normal;
         }
@@ -367,7 +369,7 @@ class _TimelinePainter extends CustomPainter {
         final nextEvent = futureEvents.first;
         final untilStart = nextEvent.startTime.difference(now);
         if (untilStart.inMinutes <= 60) {
-          text = 'next ${untilStart.inMinutes}m';
+          text = '${untilStart.inMinutes}m';
         }
       }
     }
