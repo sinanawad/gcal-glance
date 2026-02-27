@@ -3,10 +3,13 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:gcal_glance/config/crt_theme.dart';
 import 'package:gcal_glance/models/calendar_event.dart';
 import 'package:gcal_glance/models/calendar_info.dart';
+import 'package:gcal_glance/models/weather_condition.dart';
 import 'package:gcal_glance/services/google_calendar_service.dart';
+import 'package:gcal_glance/services/weather_service.dart';
 import 'package:gcal_glance/widgets/calendar_picker.dart';
 import 'package:gcal_glance/widgets/clock_column.dart';
 import 'package:gcal_glance/widgets/detail_area.dart';
@@ -44,6 +47,13 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
   final Set<String> _notifiedEventKeys = {};
   final Map<String, String?> _photoCache = {};
   late final FocusNode _focusNode;
+
+  // Weather state
+  WeatherCondition? _weather;
+  WeatherLocation? _location;
+  Timer? _weatherTimer;
+  late final http.Client _weatherHttpClient;
+  late final WeatherService _weatherService;
 
   DateTime get _simulatedNow => DateTime.now().add(_timeOffset);
 
@@ -90,7 +100,10 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
   void initState() {
     super.initState();
     _focusNode = FocusNode();
+    _weatherHttpClient = http.Client();
+    _weatherService = WeatherService(_weatherHttpClient);
     _checkCurrentUser();
+    _loadSavedLocation();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       _now.value = _simulatedNow;
       _checkMeetingStarted();
@@ -102,6 +115,8 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     _focusNode.dispose();
     _dataFetchTimer?.cancel();
     _clockTimer?.cancel();
+    _weatherTimer?.cancel();
+    _weatherHttpClient.close();
     _now.dispose();
     widget.calendarService.dispose();
     super.dispose();
@@ -124,6 +139,10 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
       if (event.logicalKey == LogicalKeyboardKey.escape &&
           _showCalendarPicker) {
         setState(() => _showCalendarPicker = false);
+        return KeyEventResult.handled;
+      }
+      if (event.logicalKey == LogicalKeyboardKey.keyW) {
+        _showWeatherLocationDialog();
         return KeyEventResult.handled;
       }
       if (event.logicalKey == LogicalKeyboardKey.keyO && _isLoggedIn) {
@@ -198,6 +217,8 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
       _selectedCalendarIds = {};
       _showCalendarPicker = false;
       _photoCache.clear();
+      _weather = null;
+      _weatherTimer?.cancel();
       _dataFetchTimer?.cancel();
     });
   }
@@ -414,6 +435,135 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
         return event;
       }).toList();
     });
+  }
+
+  // ─── Weather ──────────────────────────────────────────────
+
+  static const _weatherLocationKey = 'weather_location';
+  static const _weatherPollInterval = Duration(minutes: 30);
+
+  Future<void> _loadSavedLocation() async {
+    try {
+      const storage = FlutterSecureStorage();
+      final json = await storage.read(key: _weatherLocationKey);
+      if (json != null) {
+        final loc = WeatherLocation.fromJsonString(json);
+        if (loc != null) {
+          _location = loc;
+          _fetchWeather();
+          _startWeatherPolling();
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to load saved weather location: $e');
+    }
+  }
+
+  Future<void> _saveLocation(WeatherLocation loc) async {
+    try {
+      const storage = FlutterSecureStorage();
+      await storage.write(
+        key: _weatherLocationKey,
+        value: loc.toJsonString(),
+      );
+    } catch (e) {
+      debugPrint('Failed to save weather location: $e');
+    }
+  }
+
+  void _startWeatherPolling() {
+    _weatherTimer?.cancel();
+    _weatherTimer = Timer.periodic(_weatherPollInterval, (_) {
+      _fetchWeather();
+    });
+  }
+
+  Future<void> _fetchWeather() async {
+    if (_location == null) return;
+    try {
+      final result = await _weatherService.fetchWeather(_location!);
+      if (result != null && mounted) {
+        setState(() => _weather = result);
+      }
+      // On failure: retain existing _weather (graceful degradation)
+    } catch (e) {
+      debugPrint('Weather fetch failed: $e');
+    }
+  }
+
+  Future<void> _showWeatherLocationDialog() async {
+    final controller = TextEditingController();
+    final cityName = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: CrtTheme.clockFlap,
+        title: Text(
+          'Set Weather Location',
+          style: GoogleFonts.vt323(
+            fontSize: 22,
+            color: CrtTheme.textPrimary,
+          ),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: GoogleFonts.vt323(
+            fontSize: 18,
+            color: CrtTheme.textPrimary,
+          ),
+          decoration: InputDecoration(
+            hintText: 'Enter city name (e.g. Sofia)',
+            hintStyle: GoogleFonts.vt323(
+              fontSize: 18,
+              color: CrtTheme.textSecondary.withValues(alpha: 0.5),
+            ),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(
+                color: CrtTheme.textSecondary.withValues(alpha: 0.3),
+              ),
+            ),
+            focusedBorder: const UnderlineInputBorder(
+              borderSide: BorderSide(color: CrtTheme.ongoing),
+            ),
+          ),
+          onSubmitted: (value) => Navigator.of(ctx).pop(value),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.vt323(
+                fontSize: 16,
+                color: CrtTheme.textSecondary,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text),
+            child: Text(
+              'Set',
+              style: GoogleFonts.vt323(
+                fontSize: 16,
+                color: CrtTheme.ongoing,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (cityName == null || cityName.trim().isEmpty) return;
+
+    final loc = await _weatherService.fetchLocationByCity(cityName.trim());
+    if (loc != null) {
+      _location = loc;
+      await _saveLocation(loc);
+      _fetchWeather();
+      _startWeatherPolling();
+    } else {
+      _showErrorSnackBar('Could not find location "$cityName". Try again.');
+    }
   }
 
   /// Select hero events: ongoing primary events with meeting links.
@@ -703,6 +853,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
               now: _now,
               isMuted: _isMuted,
               onToggleMute: () => setState(() => _isMuted = !_isMuted),
+              weather: _weather,
             ),
           const Expanded(
             child: Center(child: CircularProgressIndicator()),
@@ -718,6 +869,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
               now: _now,
               isMuted: _isMuted,
               onToggleMute: () => setState(() => _isMuted = !_isMuted),
+              weather: _weather,
             ),
           Expanded(
             child: Center(
@@ -749,6 +901,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
               bottomContent: _buildMeetingCountdown(),
               isMuted: _isMuted,
               onToggleMute: () => setState(() => _isMuted = !_isMuted),
+              weather: _weather,
             ),
             // Right: Timeline strip + detail area
             Expanded(

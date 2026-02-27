@@ -63,6 +63,32 @@ class HeroCard extends StatelessWidget {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (event.otherAttendeeEmail != null) ...[
+                      Padding(
+                        padding: EdgeInsets.only(
+                            right: 12, top: compact ? 0 : 4),
+                        child: event.otherAttendeePhotoUrl != null
+                            ? CircleAvatar(
+                                radius: compact ? 16 : 24,
+                                backgroundImage: NetworkImage(
+                                    event.otherAttendeePhotoUrl!),
+                                backgroundColor: CrtTheme.clockFlap,
+                              )
+                            : CircleAvatar(
+                                radius: compact ? 16 : 24,
+                                backgroundColor: CrtTheme.clockFlap,
+                                child: Text(
+                                  event.otherAttendeeEmail!
+                                      .substring(0, 1)
+                                      .toUpperCase(),
+                                  style: GoogleFonts.vt323(
+                                    fontSize: compact ? 18 : 28,
+                                    color: CrtTheme.textSecondary,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ],
                     if (event.isTentative) ...[
                       Text(
                         'TENTATIVE',

@@ -108,14 +108,12 @@ Files outside this repo (on deployment machine):
 The KWin script uses `workspace.windowAdded` signal to match `resourceClass === "coach.incremental.gcal-glance"` and sets `skipTaskbar = true` + positions on DP-4.
 
 ## Recent Changes
+- 003-weather-background: Added Dart 3.11.0 / Flutter 3.41.2 + http (already available), dart:convert, flutter_secure_storage (already available)
 
 - 002-ui-redesign (latest): CRT retro UI, contact photos, past events, multi-calendar, RSVP filtering, meeting chirp, timeline, hero cards, KDE integration
 - 001-code-quality-cleanup: App renamed to gcal-glance, restructured into standard Flutter layout, constructor-injected service, derived model status
 
 ## Active Technologies
+- Dart 3.11.0 / Flutter 3.41.2 + http (already available), dart:convert, flutter_secure_storage (already available) (003-weather-background)
+- flutter_secure_storage for location persistence (libsecret on Linux) (003-weather-background)
 
-- Dart 3.11.0 / Flutter 3.41.2
-- googleapis 16.x (Calendar + People APIs), googleapis_auth 2.x
-- flutter_secure_storage 10.x (libsecret on Linux)
-- url_launcher 6.x, google_fonts
-- GTK3 runner (linux/runner/my_application.cc)

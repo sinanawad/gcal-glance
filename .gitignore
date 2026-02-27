@@ -48,6 +48,7 @@ app.*.map.json
 
 # Secrets / credentials
 lib/config/oauth_config.dart
+lib/config/weather_config.dart
 svc-keyfile.json
 *.keystore
 *.jks

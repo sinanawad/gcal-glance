@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'package:gcal_glance/config/crt_theme.dart';
+import 'package:gcal_glance/models/weather_condition.dart';
 import 'package:gcal_glance/widgets/flip_clock.dart';
 
 class ClockColumn extends StatelessWidget {
@@ -10,6 +11,7 @@ class ClockColumn extends StatelessWidget {
   final Widget? bottomContent;
   final bool isMuted;
   final VoidCallback? onToggleMute;
+  final WeatherCondition? weather;
 
   const ClockColumn({
     super.key,
@@ -17,6 +19,7 @@ class ClockColumn extends StatelessWidget {
     this.bottomContent,
     this.isMuted = false,
     this.onToggleMute,
+    this.weather,
   });
 
   static const _weekdays = [
@@ -70,6 +73,7 @@ class ClockColumn extends StatelessWidget {
                 final year = dateTime.year;
 
                 return Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
                       weekday,
@@ -79,6 +83,32 @@ class ClockColumn extends StatelessWidget {
                       ),
                       textAlign: TextAlign.center,
                     ),
+                    // Weather icon + temperature row, or plain date
+                    if (weather != null && weather!.iconUrl != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 2),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.network(
+                              weather!.iconUrl!,
+                              width: 48,
+                              height: 48,
+                              errorBuilder: (_, _, _) =>
+                                  const SizedBox(width: 48, height: 48),
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              weather!.temperatureDisplay,
+                              style: GoogleFonts.vt323(
+                                fontSize: 32,
+                                color: CrtTheme.textPrimary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     Text(
                       '$day $month $year',
                       style: GoogleFonts.vt323(
