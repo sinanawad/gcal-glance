@@ -1,30 +1,28 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:gcal_glance/config/weather_config.dart';
 import 'package:gcal_glance/models/weather_condition.dart';
 import 'package:http/http.dart' as http;
 
-/// Fetches weather data from WeatherAPI.com using the forecast endpoint.
+/// Fetches current weather data from Open-Meteo (free, no API key).
 ///
-/// The free tier's current.json returns empty data, so we use
-/// forecast.json?days=1 which provides today's forecast reliably.
-///
-/// Accepts an [http.Client] via constructor for testability
-/// (Constitution VII: constructor injection).
+/// Accepts an [http.Client] via constructor for testability.
 class WeatherService {
   final http.Client _client;
 
   WeatherService(this._client);
 
-  static const _baseUrl = 'https://api.weatherapi.com/v1/forecast.json';
+  static const _weatherUrl = 'https://api.open-meteo.com/v1/forecast';
+  static const _geocodingUrl =
+      'https://geocoding-api.open-meteo.com/v1/search';
 
-  /// Fetches today's forecast for the given [location].
+  /// Fetches current weather for the given [location].
   /// Returns `null` on any error (network, parse, API error).
   Future<WeatherCondition?> fetchWeather(WeatherLocation location) async {
     try {
       final uri = Uri.parse(
-        '$_baseUrl?key=$weatherApiKey&q=${location.latitude},${location.longitude}&days=1',
+        '$_weatherUrl?latitude=${location.latitude}&longitude=${location.longitude}'
+        '&current=temperature_2m,weather_code,is_day',
       );
       final response = await _client.get(uri);
       if (response.statusCode != 200) return null;
@@ -37,27 +35,25 @@ class WeatherService {
     }
   }
 
-  /// Resolves a city name to a [WeatherLocation] by making an API call.
-  /// The response includes the resolved lat/lon and canonical city name.
+  /// Resolves a city name to a [WeatherLocation] using Open-Meteo geocoding.
   /// Returns `null` on any error.
   Future<WeatherLocation?> fetchLocationByCity(String cityName) async {
     try {
       final uri = Uri.parse(
-        '$_baseUrl?key=$weatherApiKey&q=${Uri.encodeComponent(cityName)}&days=1',
+        '$_geocodingUrl?name=${Uri.encodeComponent(cityName)}&count=1',
       );
       final response = await _client.get(uri);
       if (response.statusCode != 200) return null;
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
-      final location = json['location'] as Map<String, dynamic>;
-      final name = location['name'] as String;
-      final lat = (location['lat'] as num).toDouble();
-      final lon = (location['lon'] as num).toDouble();
+      final results = json['results'] as List<dynamic>?;
+      if (results == null || results.isEmpty) return null;
 
+      final first = results[0] as Map<String, dynamic>;
       return WeatherLocation(
-        cityName: name,
-        latitude: lat,
-        longitude: lon,
+        cityName: first['name'] as String,
+        latitude: (first['latitude'] as num).toDouble(),
+        longitude: (first['longitude'] as num).toDouble(),
       );
     } catch (e) {
       debugPrint('WeatherService: fetchLocationByCity exception=$e');

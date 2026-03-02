@@ -21,26 +21,22 @@ void main() {
     registerFallbackValue(Uri.parse('https://example.com'));
   });
 
-  final sampleApiResponse = jsonEncode({
-    'location': {
-      'name': 'Sofia',
-      'lat': 42.7,
-      'lon': 23.32,
-      'localtime': '2026-02-27 14:42',
+  final sampleWeatherResponse = jsonEncode({
+    'current': {
+      'temperature_2m': 14.5,
+      'weather_code': 2,
+      'is_day': 1,
     },
-    'forecast': {
-      'forecastday': [
-        {
-          'day': {
-            'avgtemp_c': 14.0,
-            'condition': {
-              'text': 'Partly cloudy',
-              'icon': '//cdn.weatherapi.com/weather/64x64/day/116.png',
-            },
-          },
-        },
-      ],
-    },
+  });
+
+  final sampleGeocodingResponse = jsonEncode({
+    'results': [
+      {
+        'name': 'Sofia',
+        'latitude': 42.6977,
+        'longitude': 23.3219,
+      },
+    ],
   });
 
   group('fetchWeather', () {
@@ -52,15 +48,14 @@ void main() {
       );
 
       when(() => mockClient.get(any())).thenAnswer(
-        (_) async => http.Response(sampleApiResponse, 200),
+        (_) async => http.Response(sampleWeatherResponse, 200),
       );
 
       final result = await service.fetchWeather(location);
       expect(result, isNotNull);
       expect(result!.category, WeatherCategory.partlyCloudy);
-      expect(result.temperature, 14.0);
+      expect(result.temperature, 14.5);
       expect(result.isDaytime, true);
-      expect(result.description, 'Partly cloudy');
     });
 
     test('returns null on HTTP error', () async {
@@ -71,7 +66,7 @@ void main() {
       );
 
       when(() => mockClient.get(any())).thenAnswer(
-        (_) async => http.Response('{"error": "bad key"}', 401),
+        (_) async => http.Response('{"error": "bad request"}', 400),
       );
 
       final result = await service.fetchWeather(location);
@@ -112,14 +107,23 @@ void main() {
   group('fetchLocationByCity', () {
     test('returns WeatherLocation with resolved lat/lon', () async {
       when(() => mockClient.get(any())).thenAnswer(
-        (_) async => http.Response(sampleApiResponse, 200),
+        (_) async => http.Response(sampleGeocodingResponse, 200),
       );
 
       final result = await service.fetchLocationByCity('Sofia');
       expect(result, isNotNull);
       expect(result!.cityName, 'Sofia');
-      expect(result.latitude, 42.7);
-      expect(result.longitude, 23.32);
+      expect(result.latitude, 42.6977);
+      expect(result.longitude, 23.3219);
+    });
+
+    test('returns null when no results found', () async {
+      when(() => mockClient.get(any())).thenAnswer(
+        (_) async => http.Response(jsonEncode({}), 200),
+      );
+
+      final result = await service.fetchLocationByCity('Xyzzyville');
+      expect(result, isNull);
     });
 
     test('returns null on HTTP error', () async {

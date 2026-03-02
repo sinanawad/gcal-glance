@@ -2,55 +2,92 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gcal_glance/models/weather_condition.dart';
 
 void main() {
-  group('WeatherCategory.fromCode', () {
-    test('maps 1000 to clear', () {
-      expect(WeatherCategory.fromCode(1000), WeatherCategory.clear);
+  group('WeatherCategory.fromWmoCode', () {
+    test('maps 0 and 1 to clear', () {
+      expect(WeatherCategory.fromWmoCode(0), WeatherCategory.clear);
+      expect(WeatherCategory.fromWmoCode(1), WeatherCategory.clear);
     });
 
-    test('maps 1003 to partlyCloudy', () {
-      expect(WeatherCategory.fromCode(1003), WeatherCategory.partlyCloudy);
+    test('maps 2 to partlyCloudy', () {
+      expect(WeatherCategory.fromWmoCode(2), WeatherCategory.partlyCloudy);
     });
 
-    test('maps 1006 and 1009 to cloudy', () {
-      expect(WeatherCategory.fromCode(1006), WeatherCategory.cloudy);
-      expect(WeatherCategory.fromCode(1009), WeatherCategory.cloudy);
-    });
-
-    test('maps rain codes to rain', () {
-      expect(WeatherCategory.fromCode(1063), WeatherCategory.rain);
-      expect(WeatherCategory.fromCode(1150), WeatherCategory.rain);
-      expect(WeatherCategory.fromCode(1183), WeatherCategory.rain);
-      expect(WeatherCategory.fromCode(1201), WeatherCategory.rain);
-      expect(WeatherCategory.fromCode(1240), WeatherCategory.rain);
-      expect(WeatherCategory.fromCode(1246), WeatherCategory.rain);
-    });
-
-    test('maps snow codes to snow', () {
-      expect(WeatherCategory.fromCode(1066), WeatherCategory.snow);
-      expect(WeatherCategory.fromCode(1114), WeatherCategory.snow);
-      expect(WeatherCategory.fromCode(1117), WeatherCategory.snow);
-      expect(WeatherCategory.fromCode(1210), WeatherCategory.snow);
-      expect(WeatherCategory.fromCode(1237), WeatherCategory.snow);
-      expect(WeatherCategory.fromCode(1255), WeatherCategory.snow);
-      expect(WeatherCategory.fromCode(1264), WeatherCategory.snow);
-    });
-
-    test('maps thunderstorm codes to thunderstorm', () {
-      expect(WeatherCategory.fromCode(1087), WeatherCategory.thunderstorm);
-      expect(WeatherCategory.fromCode(1273), WeatherCategory.thunderstorm);
-      expect(WeatherCategory.fromCode(1276), WeatherCategory.thunderstorm);
-      expect(WeatherCategory.fromCode(1282), WeatherCategory.thunderstorm);
+    test('maps 3 to cloudy', () {
+      expect(WeatherCategory.fromWmoCode(3), WeatherCategory.cloudy);
     });
 
     test('maps fog codes to fog', () {
-      expect(WeatherCategory.fromCode(1030), WeatherCategory.fog);
-      expect(WeatherCategory.fromCode(1135), WeatherCategory.fog);
-      expect(WeatherCategory.fromCode(1147), WeatherCategory.fog);
+      expect(WeatherCategory.fromWmoCode(45), WeatherCategory.fog);
+      expect(WeatherCategory.fromWmoCode(48), WeatherCategory.fog);
+    });
+
+    test('maps drizzle and rain codes to rain', () {
+      expect(WeatherCategory.fromWmoCode(51), WeatherCategory.rain);
+      expect(WeatherCategory.fromWmoCode(53), WeatherCategory.rain);
+      expect(WeatherCategory.fromWmoCode(55), WeatherCategory.rain);
+      expect(WeatherCategory.fromWmoCode(61), WeatherCategory.rain);
+      expect(WeatherCategory.fromWmoCode(63), WeatherCategory.rain);
+      expect(WeatherCategory.fromWmoCode(65), WeatherCategory.rain);
+      expect(WeatherCategory.fromWmoCode(80), WeatherCategory.rain);
+      expect(WeatherCategory.fromWmoCode(82), WeatherCategory.rain);
+    });
+
+    test('maps freezing precipitation to rain', () {
+      expect(WeatherCategory.fromWmoCode(56), WeatherCategory.rain);
+      expect(WeatherCategory.fromWmoCode(57), WeatherCategory.rain);
+      expect(WeatherCategory.fromWmoCode(66), WeatherCategory.rain);
+      expect(WeatherCategory.fromWmoCode(67), WeatherCategory.rain);
+    });
+
+    test('maps snow codes to snow', () {
+      expect(WeatherCategory.fromWmoCode(71), WeatherCategory.snow);
+      expect(WeatherCategory.fromWmoCode(73), WeatherCategory.snow);
+      expect(WeatherCategory.fromWmoCode(75), WeatherCategory.snow);
+      expect(WeatherCategory.fromWmoCode(77), WeatherCategory.snow);
+      expect(WeatherCategory.fromWmoCode(85), WeatherCategory.snow);
+      expect(WeatherCategory.fromWmoCode(86), WeatherCategory.snow);
+    });
+
+    test('maps thunderstorm codes to thunderstorm', () {
+      expect(WeatherCategory.fromWmoCode(95), WeatherCategory.thunderstorm);
+      expect(WeatherCategory.fromWmoCode(96), WeatherCategory.thunderstorm);
+      expect(WeatherCategory.fromWmoCode(99), WeatherCategory.thunderstorm);
     });
 
     test('maps unknown codes to cloudy fallback', () {
-      expect(WeatherCategory.fromCode(9999), WeatherCategory.cloudy);
-      expect(WeatherCategory.fromCode(0), WeatherCategory.cloudy);
+      expect(WeatherCategory.fromWmoCode(9999), WeatherCategory.cloudy);
+      expect(WeatherCategory.fromWmoCode(-1), WeatherCategory.cloudy);
+    });
+  });
+
+  group('WeatherCategory.wmoToIconCode', () {
+    test('maps clear to 113', () {
+      expect(WeatherCategory.wmoToIconCode(0), 113);
+      expect(WeatherCategory.wmoToIconCode(1), 113);
+    });
+
+    test('maps partly cloudy to 116', () {
+      expect(WeatherCategory.wmoToIconCode(2), 116);
+    });
+
+    test('maps rain intensities to different icons', () {
+      expect(WeatherCategory.wmoToIconCode(61), 296); // slight
+      expect(WeatherCategory.wmoToIconCode(63), 302); // moderate
+      expect(WeatherCategory.wmoToIconCode(65), 308); // heavy
+    });
+
+    test('maps snow intensities to different icons', () {
+      expect(WeatherCategory.wmoToIconCode(71), 326); // slight
+      expect(WeatherCategory.wmoToIconCode(73), 332); // moderate
+      expect(WeatherCategory.wmoToIconCode(75), 338); // heavy
+    });
+
+    test('maps thunderstorm to 389', () {
+      expect(WeatherCategory.wmoToIconCode(95), 389);
+    });
+
+    test('maps unknown to 119 (cloudy)', () {
+      expect(WeatherCategory.wmoToIconCode(9999), 119);
     });
   });
 
@@ -75,7 +112,7 @@ void main() {
         category: WeatherCategory.clear,
         temperature: 14.3,
         isDaytime: true,
-        description: 'Sunny',
+        description: '',
         updatedAt: DateTime(2026, 1, 1),
       );
       expect(condition.temperatureDisplay, '14°');
@@ -86,7 +123,7 @@ void main() {
         category: WeatherCategory.snow,
         temperature: -5.7,
         isDaytime: false,
-        description: 'Blizzard',
+        description: '',
         updatedAt: DateTime.now(),
       );
       expect(condition.temperatureDisplay, '-6°');
@@ -97,57 +134,38 @@ void main() {
         category: WeatherCategory.cloudy,
         temperature: 0.0,
         isDaytime: true,
-        description: 'Overcast',
+        description: '',
         updatedAt: DateTime.now(),
       );
       expect(condition.temperatureDisplay, '0°');
     });
 
-    test('fromApiResponse parses valid forecast response', () {
+    test('fromApiResponse parses valid Open-Meteo response', () {
       final json = {
-        'location': {
-          'name': 'Sofia',
-          'lat': 42.7,
-          'lon': 23.32,
-          'localtime': '2026-02-27 14:42',
-        },
-        'forecast': {
-          'forecastday': [
-            {
-              'day': {
-                'avgtemp_c': 22.5,
-                'condition': {
-                  'text': 'Partly cloudy',
-                  'icon': '//cdn.weatherapi.com/weather/64x64/day/116.png',
-                },
-              },
-            },
-          ],
+        'current': {
+          'temperature_2m': 14.5,
+          'weather_code': 2,
+          'is_day': 1,
         },
       };
 
       final result = WeatherCondition.fromApiResponse(json);
       expect(result, isNotNull);
       expect(result!.category, WeatherCategory.partlyCloudy);
-      expect(result.temperature, 22.5);
+      expect(result.temperature, 14.5);
       expect(result.isDaytime, true);
-      expect(result.description, 'Partly cloudy');
+      expect(
+        result.iconUrl,
+        'https://cdn.weatherapi.com/weather/128x128/day/116.png',
+      );
     });
 
-    test('fromApiResponse detects nighttime from icon URL', () {
+    test('fromApiResponse uses night icon when is_day is 0', () {
       final json = {
-        'forecast': {
-          'forecastday': [
-            {
-              'day': {
-                'avgtemp_c': 5.0,
-                'condition': {
-                  'text': 'Clear',
-                  'icon': '//cdn.weatherapi.com/weather/64x64/night/113.png',
-                },
-              },
-            },
-          ],
+        'current': {
+          'temperature_2m': 5.0,
+          'weather_code': 0,
+          'is_day': 0,
         },
       };
 
@@ -155,11 +173,15 @@ void main() {
       expect(result, isNotNull);
       expect(result!.isDaytime, false);
       expect(result.category, WeatherCategory.clear);
+      expect(
+        result.iconUrl,
+        'https://cdn.weatherapi.com/weather/128x128/night/113.png',
+      );
     });
 
     test('fromApiResponse returns null on malformed JSON', () {
       expect(WeatherCondition.fromApiResponse({}), isNull);
-      expect(WeatherCondition.fromApiResponse({'forecast': 'bad'}), isNull);
+      expect(WeatherCondition.fromApiResponse({'current': 'bad'}), isNull);
     });
 
     test('isAnimated delegates to category', () {
@@ -167,14 +189,14 @@ void main() {
         category: WeatherCategory.rain,
         temperature: 10.0,
         isDaytime: true,
-        description: 'Rain',
+        description: '',
         updatedAt: DateTime.now(),
       );
       final clear = WeatherCondition(
         category: WeatherCategory.clear,
         temperature: 25.0,
         isDaytime: true,
-        description: 'Sunny',
+        description: '',
         updatedAt: DateTime.now(),
       );
       expect(rain.isAnimated, true);
