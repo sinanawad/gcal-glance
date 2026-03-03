@@ -12,6 +12,11 @@ class ClockColumn extends StatelessWidget {
   final bool isMuted;
   final VoidCallback? onToggleMute;
   final WeatherCondition? weather;
+  final DateTime? smokeTimerStart;
+  final VoidCallback? onSmokeTimer;
+
+  /// Duration after which the smoke timer turns green.
+  static const smokeDuration = Duration(minutes: 90);
 
   const ClockColumn({
     super.key,
@@ -20,6 +25,8 @@ class ClockColumn extends StatelessWidget {
     this.isMuted = false,
     this.onToggleMute,
     this.weather,
+    this.smokeTimerStart,
+    this.onSmokeTimer,
   });
 
   static const _weekdays = [
@@ -124,7 +131,7 @@ class ClockColumn extends StatelessWidget {
             const Spacer(),
             ?bottomContent,
             const Spacer(),
-            // Mute + Exit buttons at the bottom
+            // Mute + Smoke timer + Exit buttons at the bottom
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
@@ -141,6 +148,59 @@ class ClockColumn extends StatelessWidget {
                       iconSize: 20,
                       onPressed: onToggleMute,
                       tooltip: isMuted ? 'Unmute (M)' : 'Mute (M)',
+                    ),
+                  if (onSmokeTimer != null)
+                    ValueListenableBuilder<DateTime>(
+                      valueListenable: now,
+                      builder: (context, currentTime, _) {
+                        final double progress;
+                        final bool isComplete;
+                        if (smokeTimerStart == null) {
+                          progress = 0.0;
+                          isComplete = false;
+                        } else {
+                          final elapsed =
+                              currentTime.difference(smokeTimerStart!);
+                          progress = (elapsed.inSeconds /
+                                  smokeDuration.inSeconds)
+                              .clamp(0.0, 1.0);
+                          isComplete = progress >= 1.0;
+                        }
+                        final color = isComplete
+                            ? CrtTheme.normal
+                            : smokeTimerStart != null
+                                ? CrtTheme.upcoming
+                                : CrtTheme.textSecondary;
+                        return GestureDetector(
+                          onTap: onSmokeTimer,
+                          child: SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                if (smokeTimerStart != null)
+                                  SizedBox(
+                                    width: 32,
+                                    height: 32,
+                                    child: CircularProgressIndicator(
+                                      value: progress,
+                                      strokeWidth: 2.5,
+                                      color: color,
+                                      backgroundColor: CrtTheme.textSecondary
+                                          .withValues(alpha: 0.2),
+                                    ),
+                                  ),
+                                Icon(
+                                  Icons.smoking_rooms,
+                                  size: 18,
+                                  color: color,
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   IconButton(
                     icon: const Icon(Icons.exit_to_app),

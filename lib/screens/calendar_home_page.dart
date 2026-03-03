@@ -48,6 +48,9 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
   final Map<String, String?> _photoCache = {};
   late final FocusNode _focusNode;
 
+  // Smoke timer state
+  DateTime? _smokeTimerStart;
+
   // Weather state
   WeatherCondition? _weather;
   WeatherLocation? _location;
@@ -854,6 +857,8 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
               isMuted: _isMuted,
               onToggleMute: () => setState(() => _isMuted = !_isMuted),
               weather: _weather,
+              smokeTimerStart: _smokeTimerStart,
+              onSmokeTimer: () => setState(() => _smokeTimerStart = DateTime.now()),
             ),
           const Expanded(
             child: Center(child: CircularProgressIndicator()),
@@ -870,6 +875,8 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
               isMuted: _isMuted,
               onToggleMute: () => setState(() => _isMuted = !_isMuted),
               weather: _weather,
+              smokeTimerStart: _smokeTimerStart,
+              onSmokeTimer: () => setState(() => _smokeTimerStart = DateTime.now()),
             ),
           Expanded(
             child: Center(
@@ -902,6 +909,8 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
               isMuted: _isMuted,
               onToggleMute: () => setState(() => _isMuted = !_isMuted),
               weather: _weather,
+              smokeTimerStart: _smokeTimerStart,
+              onSmokeTimer: () => setState(() => _smokeTimerStart = DateTime.now()),
             ),
             // Right: Timeline strip + detail area
             Expanded(
