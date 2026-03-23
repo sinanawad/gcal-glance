@@ -15,6 +15,7 @@ class CalendarEvent {
   final int? calendarColorValue; // ARGB int from Google hex color
   final String? otherAttendeeEmail; // For 1-on-1 meetings: other person's email
   final String? otherAttendeePhotoUrl; // Populated after People API fetch
+  final bool otherAttendeeDeclined; // For 1-on-1: other person declined
 
   const CalendarEvent({
     required this.summary,
@@ -27,6 +28,7 @@ class CalendarEvent {
     this.calendarColorValue,
     this.otherAttendeeEmail,
     this.otherAttendeePhotoUrl,
+    this.otherAttendeeDeclined = false,
   });
 
   /// Returns a copy with the photo URL set (used after async People API fetch).
@@ -41,12 +43,15 @@ class CalendarEvent {
         calendarColorValue: calendarColorValue,
         otherAttendeeEmail: otherAttendeeEmail,
         otherAttendeePhotoUrl: photoUrl,
+        otherAttendeeDeclined: otherAttendeeDeclined,
       );
 
-  /// Whether the user's response is tentative or needsAction.
+  /// Whether the user's response is tentative or needsAction,
+  /// or the other attendee in a 1-on-1 has declined.
   bool get isTentative =>
       responseStatus == ResponseStatus.tentative ||
-      responseStatus == ResponseStatus.needsAction;
+      responseStatus == ResponseStatus.needsAction ||
+      otherAttendeeDeclined;
 
   /// Whether the user has accepted the event (or is organizer with no attendees).
   bool get isAccepted => responseStatus == ResponseStatus.accepted;
@@ -88,6 +93,7 @@ class CalendarEvent {
 
     // Detect 1-on-1 meetings: exactly 2 non-resource attendees.
     String? otherEmail;
+    bool otherDeclined = false;
     final attendees = event.attendees
         ?.cast<calendar.EventAttendee?>()
         .where((a) => a != null && a.resource != true)
@@ -97,6 +103,7 @@ class CalendarEvent {
       final otherIdx = attendees.indexWhere((a) => a.self != true);
       if (otherIdx >= 0) {
         otherEmail = attendees[otherIdx].email;
+        otherDeclined = attendees[otherIdx].responseStatus == 'declined';
       }
     }
 
@@ -110,6 +117,7 @@ class CalendarEvent {
       isPrimary: isPrimary,
       calendarColorValue: calendarColorValue,
       otherAttendeeEmail: otherEmail,
+      otherAttendeeDeclined: otherDeclined,
     );
   }
 
