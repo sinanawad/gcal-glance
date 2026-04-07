@@ -488,10 +488,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
       if (result != null && mounted) {
         setState(() => _weather = result);
       }
-      // On failure: retain existing _weather (graceful degradation)
-    } catch (e) {
-      debugPrint('Weather fetch failed: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> _showWeatherLocationDialog() async {

@@ -16,6 +16,8 @@ class WeatherService {
   static const _geocodingUrl =
       'https://geocoding-api.open-meteo.com/v1/search';
 
+  static const _timeout = Duration(seconds: 10);
+
   /// Fetches current weather for the given [location].
   /// Returns `null` on any error (network, parse, API error).
   Future<WeatherCondition?> fetchWeather(WeatherLocation location) async {
@@ -24,7 +26,7 @@ class WeatherService {
         '$_weatherUrl?latitude=${location.latitude}&longitude=${location.longitude}'
         '&current=temperature_2m,weather_code,is_day',
       );
-      final response = await _client.get(uri);
+      final response = await _client.get(uri).timeout(_timeout);
       if (response.statusCode != 200) return null;
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -42,7 +44,7 @@ class WeatherService {
       final uri = Uri.parse(
         '$_geocodingUrl?name=${Uri.encodeComponent(cityName)}&count=1',
       );
-      final response = await _client.get(uri);
+      final response = await _client.get(uri).timeout(_timeout);
       if (response.statusCode != 200) return null;
 
       final json = jsonDecode(response.body) as Map<String, dynamic>;
