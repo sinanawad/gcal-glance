@@ -154,8 +154,13 @@ void main() {
   testWidgets('shows SnackBar when session expires', (tester) async {
     when(() => mockService.getAuthenticatedClient())
         .thenAnswer((_) async => mockClient);
-    when(() => mockService.fetchEvents(any()))
-        .thenThrow(auth.AccessDeniedException('expired'));
+    // Real fetches fail asynchronously (a failed Future), not with a
+    // synchronous throw.
+    when(() => mockService.fetchEvents(any())).thenAnswer(
+      (_) => Future<List<calendar.Event>>.error(
+        auth.AccessDeniedException('expired'),
+      ),
+    );
     when(() => mockService.signOut()).thenAnswer((_) async {});
 
     await tester.pumpWidget(
@@ -173,6 +178,72 @@ void main() {
     );
     // Should have signed out and show sign-in button again.
     expect(find.text('Sign in with Google'), findsOneWidget);
+  });
+
+  testWidgets('signs out and shows sign-in when token refresh is rejected',
+      (tester) async {
+    when(() => mockService.getAuthenticatedClient())
+        .thenAnswer((_) async => mockClient);
+    // googleapis_auth throws this when Google's token endpoint answers
+    // 400 invalid_grant to a refresh (refresh token expired or revoked).
+    when(() => mockService.fetchEvents(any())).thenAnswer(
+      (_) => Future<List<calendar.Event>>.error(
+        auth.ServerRequestFailedException(
+          'Failed to obtain access credentials. '
+          'Error: invalid_grant Token has been expired or revoked.',
+          statusCode: 400,
+          responseContent: const {'error': 'invalid_grant'},
+        ),
+      ),
+    );
+    when(() => mockService.signOut()).thenAnswer((_) async {});
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: CrtTheme.themeData(),
+        home: CalendarHomePage(calendarService: mockService),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Session expired. Please sign in again.'),
+      findsOneWidget,
+    );
+    expect(find.text('Sign in with Google'), findsOneWidget);
+    verify(() => mockService.signOut()).called(1);
+  });
+
+  testWidgets('keeps session and offers retry when token endpoint errors',
+      (tester) async {
+    when(() => mockService.getAuthenticatedClient())
+        .thenAnswer((_) async => mockClient);
+    when(() => mockService.fetchEvents(any())).thenAnswer(
+      (_) => Future<List<calendar.Event>>.error(
+        auth.ServerRequestFailedException(
+          'Failed to obtain access credentials.',
+          statusCode: 503,
+          responseContent: null,
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: CrtTheme.themeData(),
+        home: CalendarHomePage(calendarService: mockService),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('Could not refresh events. Check your connection.'),
+      findsOneWidget,
+    );
+    expect(find.text('Sign in with Google'), findsNothing);
+    verifyNever(() => mockService.signOut());
   });
 
   testWidgets('shows SnackBar when sign-in fails', (tester) async {

@@ -317,7 +317,14 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
       final results = await Future.wait(
         calendarIds.map((id) => widget.calendarService
             .fetchEvents(httpClient, calendarId: id)
-            .catchError((_) => <gcal.Event>[])),
+            .catchError(
+              (_) => <gcal.Event>[],
+              // OAuth-layer errors affect every calendar, so let them
+              // reach the handlers below instead of swallowing them.
+              test: (e) =>
+                  e is! auth.AccessDeniedException &&
+                  e is! auth.ServerRequestFailedException,
+            )),
       );
 
       final newEvents = <CalendarEvent>[];
@@ -370,36 +377,44 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
         _fetchContactPhotos(httpClient, newEvents);
       }
     } on auth.AccessDeniedException {
-      if (mounted) {
-        setState(() {
-          _hasCompletedFirstLoad = true;
-        });
-        _showErrorSnackBar('Session expired. Please sign in again.');
-        _handleSignOut();
+      _handleSessionExpired();
+    } on auth.ServerRequestFailedException catch (e) {
+      // Thrown when Google's token endpoint rejects a token refresh.
+      // 400 (invalid_grant) or 401 means the refresh token is expired or
+      // revoked; anything else is a transient token-endpoint failure.
+      if (e.statusCode == 400 || e.statusCode == 401) {
+        _handleSessionExpired();
+      } else {
+        _handleFetchFailure();
       }
     } on SocketException {
-      if (mounted) {
-        setState(() {
-          _hasCompletedFirstLoad = true;
-        });
-        _showErrorSnackBar(
-          'Could not refresh events. Check your connection.',
-          actionLabel: 'Retry',
-          onAction: _updateEvents,
-        );
-      }
+      _handleFetchFailure();
     } on http.ClientException {
-      if (mounted) {
-        setState(() {
-          _hasCompletedFirstLoad = true;
-        });
-        _showErrorSnackBar(
-          'Could not refresh events. Check your connection.',
-          actionLabel: 'Retry',
-          onAction: _updateEvents,
-        );
-      }
+      _handleFetchFailure();
     }
+  }
+
+  /// Saved credentials no longer work: sign out so the stale token is
+  /// cleared and the sign-in screen appears.
+  void _handleSessionExpired() {
+    if (!mounted) return;
+    setState(() {
+      _hasCompletedFirstLoad = true;
+    });
+    _showErrorSnackBar('Session expired. Please sign in again.');
+    _handleSignOut();
+  }
+
+  void _handleFetchFailure() {
+    if (!mounted) return;
+    setState(() {
+      _hasCompletedFirstLoad = true;
+    });
+    _showErrorSnackBar(
+      'Could not refresh events. Check your connection.',
+      actionLabel: 'Retry',
+      onAction: _updateEvents,
+    );
   }
 
   /// Fetches contact photos for 1-on-1 meeting attendees not yet cached.
