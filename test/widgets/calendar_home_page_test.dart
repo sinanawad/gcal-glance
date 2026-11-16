@@ -4,9 +4,12 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:gcal_glance/config/crt_theme.dart';
+import 'package:gcal_glance/models/weather_condition.dart';
 import 'package:gcal_glance/screens/calendar_home_page.dart';
 import 'package:gcal_glance/services/google_calendar_service.dart';
+import 'package:gcal_glance/services/weather_service.dart';
 import 'package:googleapis/calendar/v3.dart' as calendar;
 import 'package:googleapis_auth/googleapis_auth.dart' as auth;
 import 'package:http/http.dart' as http;
@@ -17,6 +20,10 @@ class MockGoogleCalendarService extends Mock
 
 class MockHttpClient extends Mock implements http.Client {}
 
+class MockWeatherService extends Mock implements WeatherService {}
+
+class MockSecureStorage extends Mock implements FlutterSecureStorage {}
+
 void main() {
   late MockGoogleCalendarService mockService;
   late MockHttpClient mockClient;
@@ -24,6 +31,9 @@ void main() {
   setUpAll(() {
     registerFallbackValue((String _) {});
     registerFallbackValue(MockHttpClient());
+    registerFallbackValue(
+      const WeatherLocation(cityName: 'X', latitude: 0, longitude: 0),
+    );
   });
 
   setUp(() {
@@ -213,6 +223,68 @@ void main() {
     );
     expect(find.text('Sign in with Google'), findsOneWidget);
     verify(() => mockService.signOut()).called(1);
+  });
+
+  testWidgets('keeps weather after session expiry and re-sign-in',
+      (tester) async {
+    FlutterError.onError = ignoreOverflowErrors;
+    addTearDown(() => FlutterError.onError = originalOnError);
+
+    final mockWeather = MockWeatherService();
+    final mockStorage = MockSecureStorage();
+    const location =
+        WeatherLocation(cityName: 'Berlin', latitude: 52.5, longitude: 13.4);
+    when(() => mockStorage.read(key: 'weather_location'))
+        .thenAnswer((_) async => location.toJsonString());
+    when(() => mockWeather.fetchWeather(any())).thenAnswer(
+      (_) async => WeatherCondition(
+        category: WeatherCategory.clear,
+        temperature: 14,
+        isDaytime: true,
+        description: '',
+        iconUrl: 'https://example.com/icon.png',
+        updatedAt: DateTime(2026),
+      ),
+    );
+
+    when(() => mockService.getAuthenticatedClient())
+        .thenAnswer((_) async => mockClient);
+    // First fetch: refresh token revoked -> automatic sign-out.
+    // Later fetches (after signing back in) succeed.
+    var fetchCount = 0;
+    when(() => mockService.fetchEvents(any())).thenAnswer((_) {
+      fetchCount++;
+      if (fetchCount == 1) {
+        return Future<List<calendar.Event>>.error(
+          auth.AccessDeniedException('revoked'),
+        );
+      }
+      return Future.value(<calendar.Event>[]);
+    });
+    when(() => mockService.signOut()).thenAnswer((_) async {});
+    when(() => mockService.signIn(any()))
+        .thenAnswer((_) async => mockClient);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: CrtTheme.themeData(),
+        home: CalendarHomePage(
+          calendarService: mockService,
+          weatherService: mockWeather,
+          secureStorage: mockStorage,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Session expired and signed out.
+    expect(find.text('Sign in with Google'), findsOneWidget);
+
+    await tester.tap(find.text('Sign in with Google'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('No upcoming events'), findsOneWidget);
+    expect(find.text('14°'), findsOneWidget);
   });
 
   testWidgets('keeps session and offers retry when token endpoint errors',

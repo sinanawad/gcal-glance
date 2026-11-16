@@ -22,7 +22,18 @@ import 'package:http/http.dart' as http;
 class CalendarHomePage extends StatefulWidget {
   final GoogleCalendarService calendarService;
 
-  const CalendarHomePage({super.key, required this.calendarService});
+  /// Injected for tests; defaults to an Open-Meteo service owned by the page.
+  final WeatherService? weatherService;
+
+  /// Injected for tests; holds the saved weather location.
+  final FlutterSecureStorage secureStorage;
+
+  const CalendarHomePage({
+    super.key,
+    required this.calendarService,
+    this.weatherService,
+    this.secureStorage = const FlutterSecureStorage(),
+  });
 
   @override
   State<CalendarHomePage> createState() => _CalendarHomePageState();
@@ -55,7 +66,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
   WeatherCondition? _weather;
   WeatherLocation? _location;
   Timer? _weatherTimer;
-  late final http.Client _weatherHttpClient;
+  http.Client? _ownedWeatherHttpClient;
   late final WeatherService _weatherService;
 
   DateTime get _simulatedNow => DateTime.now().add(_timeOffset);
@@ -103,8 +114,8 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
   void initState() {
     super.initState();
     _focusNode = FocusNode();
-    _weatherHttpClient = http.Client();
-    _weatherService = WeatherService(_weatherHttpClient);
+    _weatherService = widget.weatherService ??
+        WeatherService(_ownedWeatherHttpClient = http.Client());
     _checkCurrentUser();
     _loadSavedLocation();
     _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -119,7 +130,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
     _dataFetchTimer?.cancel();
     _clockTimer?.cancel();
     _weatherTimer?.cancel();
-    _weatherHttpClient.close();
+    _ownedWeatherHttpClient?.close();
     _now.dispose();
     widget.calendarService.dispose();
     super.dispose();
@@ -220,8 +231,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
       _selectedCalendarIds = {};
       _showCalendarPicker = false;
       _photoCache.clear();
-      _weather = null;
-      _weatherTimer?.cancel();
+      // Weather is independent of the Google account; keep it running.
       _dataFetchTimer?.cancel();
     });
   }
@@ -462,8 +472,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
 
   Future<void> _loadSavedLocation() async {
     try {
-      const storage = FlutterSecureStorage();
-      final json = await storage.read(key: _weatherLocationKey);
+      final json = await widget.secureStorage.read(key: _weatherLocationKey);
       if (json != null) {
         final loc = WeatherLocation.fromJsonString(json);
         if (loc != null) {
@@ -479,8 +488,7 @@ class _CalendarHomePageState extends State<CalendarHomePage> {
 
   Future<void> _saveLocation(WeatherLocation loc) async {
     try {
-      const storage = FlutterSecureStorage();
-      await storage.write(
+      await widget.secureStorage.write(
         key: _weatherLocationKey,
         value: loc.toJsonString(),
       );
