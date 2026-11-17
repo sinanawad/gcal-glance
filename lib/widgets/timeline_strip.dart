@@ -20,6 +20,15 @@ class TimelineStrip extends StatelessWidget {
     required this.now,
   });
 
+  /// Opacity multiplier for events without a Google Meet link (calendar
+  /// blocks, in-person meetings). Same rule as the agenda's dimmed rows.
+  static const double noMeetingLinkAlphaFactor = 0.25;
+
+  /// Multiplier applied to every alpha of an event's timeline block:
+  /// full strength for meetings with a Meet link, heavily faded otherwise.
+  static double blockAlphaFactor(CalendarEvent event) =>
+      event.meetingLink != null ? 1.0 : noMeetingLinkAlphaFactor;
+
   double _timeToX(DateTime time, DateTime currentTime, double width) {
     final viewportStart = currentTime
         .subtract(Duration(minutes: (_nowFraction * _viewportMinutes).round()));
@@ -244,6 +253,10 @@ class _TimelinePainter extends CustomPainter {
         continue;
       }
 
+      // Events without a Meet link keep their pattern and colour but are
+      // heavily faded, matching the agenda's dimmed rows.
+      final fade = TimelineStrip.blockAlphaFactor(event);
+
       // Fill pattern: tentative=crosshatch, accepted=alternating solid/stripe.
       final blockRect = Rect.fromLTWH(x1, 18, blockWidth, 52);
       final rrect = RRect.fromRectAndRadius(blockRect, const Radius.circular(4));
@@ -251,13 +264,13 @@ class _TimelinePainter extends CustomPainter {
       if (event.isTentative) {
         // Tentative: crosshatch (diagonal grid) pattern
         final fillPaint = Paint()
-          ..color = statusColor.withValues(alpha: 0.15);
+          ..color = statusColor.withValues(alpha: 0.15 * fade);
         canvas.drawRRect(rrect, fillPaint);
 
         canvas.save();
         canvas.clipRRect(rrect);
         final gridPaint = Paint()
-          ..color = statusColor.withValues(alpha: 0.35)
+          ..color = statusColor.withValues(alpha: 0.35 * fade)
           ..strokeWidth = 1.0;
         const spacing = 6.0;
         for (double d = -52; d < blockWidth + 52; d += spacing) {
@@ -270,19 +283,19 @@ class _TimelinePainter extends CustomPainter {
       } else if (acceptedIndex.isEven) {
         // Solid fill
         final fillPaint = Paint()
-          ..color = statusColor.withValues(alpha: 0.55);
+          ..color = statusColor.withValues(alpha: 0.55 * fade);
         canvas.drawRRect(rrect, fillPaint);
         acceptedIndex++;
       } else {
         // Horizontal stripe fill
         final fillPaint = Paint()
-          ..color = statusColor.withValues(alpha: 0.25);
+          ..color = statusColor.withValues(alpha: 0.25 * fade);
         canvas.drawRRect(rrect, fillPaint);
 
         canvas.save();
         canvas.clipRRect(rrect);
         final stripePaint = Paint()
-          ..color = statusColor.withValues(alpha: 0.5)
+          ..color = statusColor.withValues(alpha: 0.5 * fade)
           ..strokeWidth = 2;
         for (double y = 20; y < 70; y += 8) {
           canvas.drawLine(Offset(x1, y), Offset(x1 + blockWidth, y), stripePaint);
@@ -293,7 +306,7 @@ class _TimelinePainter extends CustomPainter {
 
       // Border outline
       final borderPaint = Paint()
-        ..color = statusColor.withValues(alpha: 0.8)
+        ..color = statusColor.withValues(alpha: 0.8 * fade)
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5;
       canvas.drawRRect(rrect, borderPaint);
